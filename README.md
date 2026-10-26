@@ -40,6 +40,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 10 | meson can't put Rust code into a C static library | meson error |
 | 11 | A no_std static library needs an unstable lang item to link | undefined `rust_eh_personality` |
 | 12 | A staticlib leaks core through libsystemd-shared's export-all version script | 545 exports, 277 KB vs 18 KB |
+| 13 | The prebuilt core can't be rebuilt with our flags | `-Zbuild-std` is nightly |
 
 ## Running them
 

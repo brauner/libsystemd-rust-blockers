@@ -1,0 +1,34 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ ls core
+core-1d288395a3394ed3.core.efd5e57aef94d71e-cgu.0.rcgu.o
+lib.rmeta
+lib.rmeta-link
+[exit status 0]
+
+$ readelf -S -W core/*.o | grep -c gcc_except_table
+1
+[exit status 0]
+
+$ readelf -n core/*.o | grep -E 'x86 feature' || echo 'no x86 feature property'
+no x86 feature property
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=unwind 13-prebuilt-core/lib.rs -o x.a
+error: unwinding panics are not supported without std
+  |
+  = help: using nightly cargo, use -Zbuild-std with panic="abort" to avoid unwinding
+  = note: since the core library is usually precompiled with panic="unwind", rebuilding your crate with panic="abort" may not be enough to fix the problem
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ (cd crate && cargo +1.99.1 build --offline -Zbuild-std=core 2>&1 | head -2)
+error: the `-Z` flag is only accepted on the nightly channel of Cargo, but this is the `stable` channel
+See https://doc.rust-lang.org/book/appendix-07-nightly-rust.html for more information about Rust release channels.
+[exit status 0]
+
+RESULT: REPRODUCED: the prebuilt core cannot be replaced on stable
