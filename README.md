@@ -24,6 +24,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | # | Problem | Result |
 |---|---------|--------|
 | 01 | A Rust-ABI shared library only works with the rustc that built it | E0786/E0514 |
+| 02 | Generic code of a Rust shared library ends up in every program | `-Zshare-generics` is nightly |
 
 ## Running them
 

@@ -1,0 +1,149 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+######## -C opt-level=2
+
+$ rustc +1.99.1 --edition 2021 --crate-type dylib -C panic=abort -C opt-level=2 02-dylib-generics/sdshared.rs
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=2 --cfg plain -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o plain
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./plain
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=2 --cfg generic -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o generic
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./generic
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=2 --cfg own_type -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o own_type
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./own_type
+[exit status 3]
+
+## plain: .text 337 bytes
+   Rust code imported from libsdshared.so:
+     sdshared::unique_u32
+   Rust code compiled into the program:
+
+## generic: .text 568 bytes
+   Rust code imported from libsdshared.so:
+     core::slice::sort::unstable::ipnsort::<u32, <u32 as core::cmp::PartialOrd>::lt>
+     core::panicking::panic_bounds_check
+   Rust code compiled into the program:
+
+## own_type: .text 3723 bytes
+   Rust code imported from libsdshared.so:
+     core::panicking::panic_bounds_check
+     core::slice::sort::shared::smallsort::panic_on_ord_violation
+   Rust code compiled into the program:
+       339     core::slice::sort::unstable::ipnsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       169     core::slice::sort::shared::pivot::median3_rec::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       152     core::slice::sort::unstable::heapsort::heapsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+      2469     core::slice::sort::unstable::quicksort::quicksort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+
+######## -C opt-level=3
+
+$ rustc +1.99.1 --edition 2021 --crate-type dylib -C panic=abort -C opt-level=3 02-dylib-generics/sdshared.rs
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=3 --cfg plain -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o plain
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./plain
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=3 --cfg generic -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o generic
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./generic
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=3 --cfg own_type -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o own_type
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./own_type
+[exit status 3]
+
+## plain: .text 337 bytes
+   Rust code imported from libsdshared.so:
+     sdshared::unique_u32
+   Rust code compiled into the program:
+
+## generic: .text 568 bytes
+   Rust code imported from libsdshared.so:
+     core::slice::sort::unstable::ipnsort::<u32, <u32 as core::cmp::PartialOrd>::lt>
+     core::panicking::panic_bounds_check
+   Rust code compiled into the program:
+
+## own_type: .text 3787 bytes
+   Rust code imported from libsdshared.so:
+     core::panicking::panic_bounds_check
+     core::slice::sort::shared::smallsort::panic_on_ord_violation
+   Rust code compiled into the program:
+       339     core::slice::sort::unstable::ipnsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       169     core::slice::sort::shared::pivot::median3_rec::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       152     core::slice::sort::unstable::heapsort::heapsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+      2544     core::slice::sort::unstable::quicksort::quicksort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+
+######## -C opt-level=s
+
+$ rustc +1.99.1 --edition 2021 --crate-type dylib -C panic=abort -C opt-level=s 02-dylib-generics/sdshared.rs
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=s --cfg plain -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o plain
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./plain
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=s --cfg generic -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o generic
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./generic
+[exit status 3]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -C opt-level=s --cfg own_type -A unused 02-dylib-generics/user.rs -L . --extern sdshared=libsdshared.so -o own_type
+[exit status 0]
+
+$ LD_LIBRARY_PATH=. ./own_type
+[exit status 3]
+
+## plain: .text 312 bytes
+   Rust code imported from libsdshared.so:
+     sdshared::unique_u32
+   Rust code compiled into the program:
+
+## generic: .text 312 bytes
+   Rust code imported from libsdshared.so:
+     sdshared::sort_unique::<u32>
+   Rust code compiled into the program:
+
+## own_type: .text 3303 bytes
+   Rust code imported from libsdshared.so:
+     core::panicking::panic_bounds_check
+     core::slice::sort::shared::smallsort::panic_on_ord_violation
+   Rust code compiled into the program:
+       137     core::slice::sort::unstable::ipnsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       176     core::slice::sort::shared::pivot::median3_rec::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+       131     core::slice::sort::unstable::heapsort::heapsort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+      2336     core::slice::sort::unstable::quicksort::quicksort::<user::Uid, <user::Uid as core::cmp::PartialOrd>::lt>
+
+$ rustc +1.99.1 --edition 2021 -Zshare-generics=yes 02-dylib-generics/user.rs -L o2 --extern sdshared=o2/libsdshared.so -o x
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+RESULT: REPRODUCED: generic library code for the program's own types is compiled into every program
