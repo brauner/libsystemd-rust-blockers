@@ -27,6 +27,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 02 | Generic code of a Rust shared library ends up in every program | `-Zshare-generics` is nightly |
 | 03 | A Rust-ABI shared library can't be built with LTO on stable | `-Zdylib-lto` is nightly |
 | 04 | A Rust-ABI shared library exports all of core, and two of them don't mix | 272 KB vs 4 KB, E0152 |
+| 05 | A shared library linked by rustc can't have versioned symbols | rust-lld drops them, GNU ld fails |
 
 ## Running them
 

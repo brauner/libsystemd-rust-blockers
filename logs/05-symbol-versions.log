@@ -1,0 +1,45 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ gcc -O2 -fPIC -fvisibility=hidden -shared 05-symbol-versions/sd.c -Wl,--version-script=05-symbol-versions/demo.sym -o libc.so
+[exit status 0]
+
+$ nm -D --defined-only libc.so
+0000000000000000 A LIBDEMO_209
+0000000000000000 A LIBDEMO_210
+0000000000001110 T sd_demo_close@@LIBDEMO_210
+0000000000001100 T sd_demo_open@@LIBDEMO_209
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type cdylib 05-symbol-versions/sd.rs -C link-arg=-Wl,--version-script=05-symbol-versions/demo.sym -o librust-lld.so
+warning: linker stderr: rust-lld: attempt to reassign symbol 'sd_demo_open' of VER_NDX_GLOBAL to version 'LIBDEMO_209'
+         rust-lld: attempt to reassign symbol 'sd_demo_close' of VER_NDX_GLOBAL to version 'LIBDEMO_210'
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: 1 warning emitted
+
+[exit status 0]
+
+$ nm -D --defined-only librust-lld.so
+0000000000001680 T sd_demo_close
+0000000000001688 T sd_demo_open
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type cdylib 05-symbol-versions/sd.rs -C link-arg=-Wl,--version-script=05-symbol-versions/demo.sym -C linker-features=-lld -o librust-bfd.so
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-Wl,--version-script=$W/rustcvC1czt/list" "-Wl,--no-undefined-version" "-m64" "$W/rustcvC1czt/symbols.o" "<1 object files omitted>" "-Wl,--as-needed" "-Wl,-Bdynamic" "-lc" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libcore-*,libcompiler_builtins-*}.rlib" "-L" "$W/rustcvC1czt/raw-dylibs" "-Wl,-Bdynamic" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "librust-bfd.so" "-Wl,--gc-sections" "-shared" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-nodefaultlibs" "-Wl,--version-script=05-symbol-versions/demo.sym"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /usr/bin/x86_64-linux-gnu-ld.bfd: anonymous version tag cannot be combined with other version tags
+          /usr/bin/x86_64-linux-gnu-ld.bfd: unable to find version dependency `LIBDEMO_209'
+          /usr/bin/x86_64-linux-gnu-ld.bfd: anonymous version tag cannot be combined with other version tags
+          collect2: error: ld returned 1 exit status
+          
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+RESULT: REPRODUCED: rust-lld drops the symbol versions, GNU ld refuses the link

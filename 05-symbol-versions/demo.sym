@@ -1,0 +1,11 @@
+LIBDEMO_209 {
+global:
+        sd_demo_open;
+local:
+        *;
+};
+
+LIBDEMO_210 {
+global:
+        sd_demo_close;
+} LIBDEMO_209;
