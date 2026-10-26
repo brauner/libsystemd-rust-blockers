@@ -1,0 +1,50 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+# old: rustc 1.85.0 (4d91de4e4 2025-02-17)
+
+$ rustc +1.99.1 --edition 2021 --crate-type dylib -C panic=abort -O 01-dylib-rustc-lock/sdshared.rs --out-dir new
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O 01-dylib-rustc-lock/user.rs -L new --extern sdshared=new/libsdshared.so -o user
+[exit status 0]
+
+$ LD_LIBRARY_PATH=new ./user
+[exit status 5]
+
+$ rustc +1.85.0 --edition 2021 -C panic=abort -O 01-dylib-rustc-lock/user.rs -L new --extern sdshared=new/libsdshared.so -o user-old
+error[E0786]: found invalid metadata files for crate `sdshared`
+ --> 01-dylib-rustc-lock/user.rs:9:11
+  |
+9 |     match sdshared::first_word(b"hello world") {
+  |           ^^^^^^^^
+  |
+  = note: invalid metadata version found: $W/new/libsdshared.so
+
+error: `#[panic_handler]` function required, but not found
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0786`.
+[exit status 1]
+
+$ rustc +1.85.0 --edition 2021 --crate-type dylib -C panic=abort -O 01-dylib-rustc-lock/sdshared.rs --out-dir old
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O 01-dylib-rustc-lock/user.rs -L old --extern sdshared=old/libsdshared.so -o user-new
+error[E0786]: found invalid metadata files for crate `sdshared`
+ --> 01-dylib-rustc-lock/user.rs:9:11
+  |
+9 |     match sdshared::first_word(b"hello world") {
+  |           ^^^^^^^^
+  |
+  = note: invalid metadata version found: $W/old/libsdshared.so
+
+error: `#[panic_handler]` function required, but not found
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0786`.
+[exit status 1]
+
+RESULT: REPRODUCED: a dylib is usable only by the rustc that built it

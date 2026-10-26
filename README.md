@@ -19,6 +19,12 @@ context is our Rust policy in docs/CODING_STYLE.md:
 - Rust code talks to the rest of systemd through C linkage only.
 - The MSRV is 1.85 because that's what Debian 13 ships.
 
+## Rust-ABI shared libraries
+
+| # | Problem | Result |
+|---|---------|--------|
+| 01 | A Rust-ABI shared library only works with the rustc that built it | E0786/E0514 |
+
 ## Running them
 
 Each directory has a README.md and a run.sh that ends with a RESULT
