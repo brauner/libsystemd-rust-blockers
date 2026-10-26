@@ -1,0 +1,228 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ grep -n -B2 -E "'-C(overflow-checks=yes|panic=abort)'" $SYSTEMD_SRC/meson.build
+477-                # rustc's default depends on the optimization level. C code in systemd checks its arithmetic
+478-                # where it matters, Rust code does not get to wrap silently either.
+479:                '-Coverflow-checks=yes',
+480-                # Unwinding could not cross the C frames of an event loop anyway, and without std there is no
+481-                # unwinder.
+482:                '-Cpanic=abort',
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=abort -C overflow-checks=yes -O 23-panic-aborts-host/lib.rs -o liblib.a
+[exit status 0]
+
+$ gcc -O2 -Wall 23-panic-aborts-host/main.c liblib.a -o main
+[exit status 0]
+
+$ ./main index
+rust: panicked at 23-panic-aborts-host/lib.rs:16: index out of bounds: the len is 4 but the index is 4
+23-panic-aborts-host/../common.sh: line 39: 48982 Aborted                    (core dumped) ./main index
+[exit status 134]
+caller killed by SIGABRT
+
+$ ./main copy
+rust: panicked at 23-panic-aborts-host/lib.rs:22: copy_from_slice: source slice length (4) does not match destination slice length (16)
+23-panic-aborts-host/../common.sh: line 39: 48989 Aborted                    (core dumped) ./main copy
+[exit status 134]
+caller killed by SIGABRT
+
+$ ./main unwrap
+rust: panicked at 23-panic-aborts-host/lib.rs:29: called `Option::unwrap()` on a `None` value
+23-panic-aborts-host/../common.sh: line 39: 48998 Aborted                    (core dumped) ./main unwrap
+[exit status 134]
+caller killed by SIGABRT
+
+$ ./main overflow
+rust: panicked at 23-panic-aborts-host/lib.rs:35: attempt to add with overflow
+23-panic-aborts-host/../common.sh: line 39: 49011 Aborted                    (core dumped) ./main overflow
+[exit status 134]
+caller killed by SIGABRT
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=abort -C overflow-checks=yes -O 23-panic-aborts-host/handler.rs -o libhandler.a
+error[E0308]: `#[panic_handler]` function has wrong type
+ --> 23-panic-aborts-host/handler.rs:5:41
+  |
+5 | fn panic(_: &core::panic::PanicInfo<'_>) {}
+  |                                         ^ expected `!`, found `()`
+  |
+  = note: expected signature `for<'a, 'b> fn(&'a PanicInfo<'b>) -> !`
+             found signature `for<'a, 'b> fn(&'a PanicInfo<'b>) -> ()`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0308`.
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=unwind -O 23-panic-aborts-host/lib.rs -o libunwind.a
+error: unwinding panics are not supported without std
+  |
+  = help: using nightly cargo, use -Zbuild-std with panic="abort" to avoid unwinding
+  = note: since the core library is usually precompiled with panic="unwind", rebuilding your crate with panic="abort" may not be enough to fix the problem
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ grep -n -B1 'pub fn catch_unwind' $RUST_SRC/library/std/src/panic.rs
+357-#[stable(feature = "catch_unwind", since = "1.9.0")]
+358:pub fn catch_unwind<F: FnOnce() -> R + UnwindSafe, R>(f: F) -> Result<R> {
+[exit status 0]
+
+$ grep -n -B2 'pub unsafe fn catch_unwind' $RUST_SRC/library/core/src/intrinsics/mod.rs
+2343-#[rustc_intrinsic]
+2344-#[rustc_nounwind]
+2345:pub unsafe fn catch_unwind<Data: ptr::Thin>(
+[exit status 0]
+
+$ grep -n -A1 '^#!\[unstable' $RUST_SRC/library/core/src/intrinsics/mod.rs
+73:#![unstable(
+74-    feature = "core_intrinsics",
+[exit status 0]
+
+$ grep -n -A17 '^#define assert_log' $SYSTEMD_SRC/src/basic/assert-util.h
+12:#define assert_log(expr)                                                \
+13-        (_likely_(expr) ?                                               \
+14-         true :                                                         \
+15-         (log_assert_failed_return(#expr, PROJECT_FILE, __LINE__, __func__), false))
+16-
+17-#define assert_return(expr, r)                                          \
+18-        do {                                                            \
+19-                if (!assert_log(expr))                                  \
+20-                        return (r);                                     \
+21-        } while (false)
+22-
+23-#define assert_return_errno(expr, r, err)                               \
+24-        do {                                                            \
+25-                if (!assert_log(expr)) {                                \
+26-                        errno = err;                                    \
+27-                        return (r);                                     \
+28-                }                                                       \
+29-        } while (false)
+[exit status 0]
+
+$ grep -n -A8 '^void log_assert_failed_return' $SYSTEMD_SRC/src/basic/assert-util.c
+49:void log_assert_failed_return(const char *text, const char *file, int line, const char *func) {
+50-        /* log_get_assert_return_is_critical is a weak symbol. It may be NULL. */
+51-        if (log_get_assert_return_is_critical && log_get_assert_return_is_critical())
+52-                log_assert_failed(text, file, line, func);
+53-
+54-        PROTECT_ERRNO;
+55-        log_assert(LOG_DEBUG, text, file, line, func,
+56-                   "Assertion '%s' failed at %s:%u, function %s(), ignoring.");
+57-}
+[exit status 0]
+
+$ grep -n -A13 '^_public_ int sd_bus_message_appendv(' $SYSTEMD_SRC/src/libsystemd/sd-bus/bus-message.c | grep assert_return
+1879-        assert_return(m, -EINVAL);
+1880-        assert_return(types, -EINVAL);
+1881-        assert_return(!m->sealed, -EPERM);
+1882-        assert_return(!m->poisoned, -ESTALE);
+[exit status 0]
+
+$ gcc -O2 -Wall 23-panic-aborts-host/einval.c -l:libsystemd.so.0 -o einval
+[exit status 0]
+
+$ ./einval
+sd_bus_message_append(NULL, "s", "foo") = -22 (Invalid argument)
+caller still running
+[exit status 0]
+
+$ nm -D /usr/lib/x86_64-linux-gnu/libsystemd.so.0 | grep assert_return_is_critical
+                 w log_get_assert_return_is_critical
+[exit status 0]
+
+$ grep -n -E 'BUILD_MODE_DEVELOPER|SYSTEMD_ASSERT_RETURN_IS_CRITICAL' $SYSTEMD_SRC/src/shared/log-assert-critical.c
+7:static bool assert_return_is_critical = BUILD_MODE_DEVELOPER;
+18:                r = secure_getenv_bool("SYSTEMD_ASSERT_RETURN_IS_CRITICAL");
+20:                        log_debug_errno(r, "Failed to parse $SYSTEMD_ASSERT_RETURN_IS_CRITICAL, ignoring: %m");
+[exit status 0]
+
+$ grep -n -A11 '^libsystemd = shared_library' $SYSTEMD_SRC/meson.build
+2108:libsystemd = shared_library(
+2109-        'systemd',
+2110-        version : libsystemd_version,
+2111-        include_directories : libsystemd_includes,
+2112-        implicit_include_directories : false,
+2113-        link_args : ['-shared',
+2114-                     # Make sure our library is never deleted from memory, so that our open logging fds don't leak on dlopen/dlclose cycles.
+2115-                     '-z', 'nodelete',
+2116-                     '-Wl,--version-script=' + libsystemd_sym_path],
+2117-        link_with : [libc_wrapper_static,
+2118-                     libbasic_static],
+2119-        link_whole : [libsystemd_static],
+[exit status 0]
+
+$ grep -n -A15 '^libshared = shared_library' $SYSTEMD_SRC/src/shared/meson.build
+466:libshared = shared_library(
+467-        libshared_name,
+468-        include_directories : includes,
+469-        implicit_include_directories : false,
+470-        c_args : ['-fvisibility=default'],
+471-        link_args : ['-shared',
+472-                     '-Wl,--version-script=' + libshared_sym_path],
+473-        link_depends : libshared_sym,
+474-        link_whole : [libc_wrapper_static,
+475-                      libshared_static,
+476-                      libbasic_static,
+477-                      libsystemd_static],
+478-        dependencies : [libshared_deps,
+479-                        userspace],
+480-        install : true,
+481-        install_dir : pkglibdir)
+[exit status 0]
+
+$ grep -n -A3 '^executable_template = {' $SYSTEMD_SRC/meson.build
+2252:executable_template = {
+2253-        'include_directories' : includes,
+2254-        'link_with' : [libshared],
+2255-        'install_rpath' : pkglibdir,
+[exit status 0]
+
+$ grep -n '= executable_template +' $SYSTEMD_SRC/meson.build
+2260:generator_template = executable_template + {
+2264:libexec_template = executable_template + {
+2272:test_template = executable_template + {
+2313:fuzz_template = executable_template + {
+[exit status 0]
+
+$ grep -n -A7 "'name' : 'systemd',$" $SYSTEMD_SRC/src/core/meson.build
+234:                'name' : 'systemd',
+235-                'dbus' : true,
+236-                'sources' : systemd_sources,
+237-                'link_args_static' : systemd_link_args,
+238-                'link_with' : [
+239-                        libcore,
+240-                        libshared,
+241-                ],
+[exit status 0]
+
+$ grep -n -A10 -E '^(nss|pam)_template = \{' $SYSTEMD_SRC/meson.build
+2335:nss_template = {
+2336-        'version' : '2',
+2337-        'include_directories' : includes,
+2338-        # Note that we link NSS modules with '-z nodelete' so that mempools never get orphaned
+2339-        'link_args' : ['-z', 'nodelete'],
+2340-        'link_with' : [
+2341-                libc_wrapper_static,
+2342-                libsystemd_static,
+2343-                libshared_static,
+2344-                libbasic_static,
+2345-        ],
+--
+2351:pam_template = {
+2352-        'name_prefix' : '',
+2353-        'include_directories' : includes,
+2354-        'link_with' : [
+2355-                libsystemd_static,
+2356-                libshared_static,
+2357-        ],
+2358-        'dependencies' : libpam_cflags,
+2359-        'install' : true,
+2360-        'install_tag' : 'pam',
+2361-        'install_dir' : pamlibdir,
+[exit status 0]
+
+RESULT: REPRODUCED: an implicit panic in a no_std extern "C" function aborts the calling process
