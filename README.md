@@ -51,6 +51,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 22 | The `alloc` crate aborts on allocation failure, libsystemd returns `-ENOMEM` | SIGABRT instead of -12 |
 | 23 | A panic in no_std Rust library code kills the process that called it | SIGABRT |
 | 24 | A foreign unwind through a Rust frame skips Drop or aborts | UB or SIGABRT |
+| 25 | `--gc-sections` drops `#[used]` section entries at our 1.85 MSRV | ld.lld drops the 1.85 entry |
 
 ## Running them
 
