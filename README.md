@@ -37,6 +37,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 |---|---------|--------|
 | 08 | Two Rust static libraries can't be linked together | duplicate `__rustc::rust_begin_unwind` |
 | 09 | A libsystemd.a with Rust inside breaks the Rust programs that link it | same as 08 |
+| 10 | meson can't put Rust code into a C static library | meson error |
 
 ## Running them
 

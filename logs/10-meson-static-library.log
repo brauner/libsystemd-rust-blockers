@@ -1,0 +1,21 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ meson --version
+1.11.1
+[exit status 0]
+
+$ meson setup src/whole build-whole 2>&1 | grep -E 'ERROR|Build targets'
+src/whole/meson.build:4:20: ERROR: Cannot link_whole a custom or Rust target 'rs' into a static library 'systemd_static'. Instead, pass individual object files with the "objects:" keyword argument if possible.
+[exit status 0]
+
+$ meson setup src/installed build-installed 2>&1 | grep -E 'ERROR|Build targets'
+src/installed/meson.build:4:0: ERROR: Cannot link_whole a custom or Rust target 'rs' into a static library 'systemd'. Instead, pass individual object files with the "objects:" keyword argument if possible. Meson had to promote link to link_whole because 'systemd' is installed but not 'rs', and thus has to include objects from 'rs' to be usable.
+[exit status 0]
+
+$ meson setup src/linkwith build-linkwith 2>&1 | grep -E 'ERROR|Build targets'
+Build targets in project: 2
+[exit status 0]
+
+RESULT: REPRODUCED: meson refuses Rust code in a C static library
