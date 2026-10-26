@@ -1,0 +1,39 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ grep -A3 "option('static-libsystemd'" $SYSTEMD_SRC/meson_options.txt
+option('static-libsystemd', type : 'combo',
+       choices : ['false', 'true', 'pic', 'no-pic'],
+       description : 'install a static library for libsystemd')
+option('static-libudev', type : 'combo',
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib 09-static-libsystemd/sd.rs -o libsystemd.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O 09-static-libsystemd/app.rs -L . -l static=systemd -o app
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "$W/rustc5HnP76/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "-lsystemd" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "$W/rustc5HnP76/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "." "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "app" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: duplicate symbol: __rustc::rust_begin_unwind
+          >>> defined at sd.89926b25a36d323-cgu.0
+          >>>            libsystemd.sd.89926b25a36d323-cgu.0.rcgu.o:(__rustc::rust_begin_unwind) in archive ./libsystemd.a
+          >>> defined at panicking.rs:612 (library/std/src/panicking.rs:612)
+          >>>            std-7e719de9c4abc98f.std.68c81ae915296b05-cgu.0.rcgu.o:(.text._RNvCs5fGHjzWXRav_7___rustc17rust_begin_unwind+0x0) in archive ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-7e719de9c4abc98f.rlib
+          collect2: error: ld returned 1 exit status
+          
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib -Zstaticlib-rename-internal-symbols 09-static-libsystemd/sd.rs -o libsystemd.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O 09-static-libsystemd/app.rs -L . -l static=systemd -o app && ./app
+8
+[exit status 0]
+
+RESULT: REPRODUCED: a Rust program cannot link a libsystemd.a that contains Rust
