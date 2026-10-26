@@ -1,0 +1,7 @@
+SD_SHARED {
+global:
+        *;
+local:
+        _R*;
+        rust_eh_personality;
+};

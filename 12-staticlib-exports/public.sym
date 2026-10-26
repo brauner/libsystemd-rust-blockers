@@ -1,0 +1,6 @@
+LIBDEMO_1 {
+global:
+        sd_demo_format_id;
+local:
+        *;
+};

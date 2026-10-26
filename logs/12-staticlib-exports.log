@@ -1,0 +1,73 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ cat $SYSTEMD_SRC/src/shared/libshared.sym
+SD_SHARED {
+        global: *;
+};
+[exit status 0]
+
+$ grep -n -A6 '^libshared = shared_library' $SYSTEMD_SRC/src/shared/meson.build
+466:libshared = shared_library(
+467-        libshared_name,
+468-        include_directories : includes,
+469-        implicit_include_directories : false,
+470-        c_args : ['-fvisibility=default'],
+471-        link_args : ['-shared',
+472-                     '-Wl,--version-script=' + libshared_sym_path],
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib 12-staticlib-exports/sd.rs -o libsd_rust.a
+[exit status 0]
+
+$ gcc -O2 -fPIC -shared -fvisibility=default 12-staticlib-exports/lib.c libsd_rust.a -Wl,--gc-sections -Wl,--version-script=12-staticlib-exports/shared.sym -o libshared.so
+[exit status 0]
+
+$ gcc -O2 -fPIC -shared -fvisibility=hidden 12-staticlib-exports/lib.c libsd_rust.a -Wl,--gc-sections -Wl,--version-script=12-staticlib-exports/public.sym -o libpublic.so
+[exit status 0]
+
+$ gcc -O2 -fPIC -shared -fvisibility=default 12-staticlib-exports/lib.c libsd_rust.a -Wl,--gc-sections -Wl,--version-script=12-staticlib-exports/hidden.sym -o libshared-hidden.so
+[exit status 0]
+
+$ gcc -O2 -fPIC -shared -fvisibility=hidden 12-staticlib-exports/c-only.c -Wl,--gc-sections -Wl,--version-script=12-staticlib-exports/public.sym -o libc-only.so
+[exit status 0]
+
+## libshared.so: 276672 bytes stripped, exports 548 symbols, 545 of them Rust:
+T core::panicking::assert_failed::<core::option::Option<usize>, core::option::Option<usize>>@@SD_SHARED
+T core::panicking::assert_failed::<usize, usize>@@SD_SHARED
+T core::panicking::assert_failed::<u64, u64>@@SD_SHARED
+T <str>::escape_debug@@SD_SHARED
+T <str>::substr_range@@SD_SHARED
+T <str>::from_utf8_mut@@SD_SHARED
+T <str>::split_at_mut_unchecked@@SD_SHARED
+T <str>::from_utf8@@SD_SHARED
+T <core::num::imp::fmt::Part>::len@@SD_SHARED
+T <core::num::imp::fmt::Part>::write@@SD_SHARED
+T <core::num::imp::diy_float::Fp>::normalize_to@@SD_SHARED
+T <core::num::imp::bignum::tests::Big8x3>::bit_length@@SD_SHARED
+
+## libpublic.so: 18440 bytes stripped, exports 1 symbols, 0 of them Rust:
+T sd_demo_format_id@@LIBDEMO_1
+
+## libshared-hidden.so: 18520 bytes stripped, exports 2 symbols, 0 of them Rust:
+T rs_format_id@@SD_SHARED
+T sd_demo_format_id@@SD_SHARED
+
+## libc-only.so: 14304 bytes stripped, exports 1 symbols, 0 of them Rust:
+T sd_demo_format_id@@LIBDEMO_1
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort --crate-type staticlib -Zstaticlib-hide-internal-symbols 12-staticlib-exports/sd.rs -o x.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+RESULT: REPRODUCED: 545 Rust symbols exported from a global: * library
