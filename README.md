@@ -50,6 +50,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 21 | No C-variadic definitions at the 1.85 MSRV, and no `long double` on 1.99 | E0658 on 1.85, wrong fields on 1.99.1 |
 | 22 | The `alloc` crate aborts on allocation failure, libsystemd returns `-ENOMEM` | SIGABRT instead of -12 |
 | 23 | A panic in no_std Rust library code kills the process that called it | SIGABRT |
+| 24 | A foreign unwind through a Rust frame skips Drop or aborts | UB or SIGABRT |
 
 ## Running them
 

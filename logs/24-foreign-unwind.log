@@ -1,0 +1,275 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ gcc -Q --help=common | grep -e -fasynchronous-unwind-tables
+  -fasynchronous-unwind-tables 		[enabled]
+[exit status 0]
+
+$ g++ -O2 -c 24-foreign-unwind/main.cpp
+[exit status 0]
+
+$ gcc -O2 -pthread -c 24-foreign-unwind/thread.c
+[exit status 0]
+
+$ gcc -O2 -c 24-foreign-unwind/lib.c -o c.o
+[exit status 0]
+
+$ gcc -O2 -fexceptions -c 24-foreign-unwind/lib.c -o c-fexceptions.o
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort -o rust-C.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort --cfg c_unwind -o rust-C-unwind.a
+[exit status 0]
+
+$ rustc +1.85.0 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort -o rust-1.85-C.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=unwind -o x.a
+error: unwinding panics are not supported without std
+  |
+  = help: using nightly cargo, use -Zbuild-std with panic="abort" to avoid unwinding
+  = note: since the core library is usually precompiled with panic="unwind", rebuilding your crate with panic="abort" may not be enough to fix the problem
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort --cfg c_unwind --cfg no_personality -o x.a
+[exit status 0]
+
+$ g++ -Wl,--gc-sections main.o x.a -o x
+/usr/bin/x86_64-linux-gnu-ld.bfd: x.a(x.lib.9b1d2436265349b7-cgu.0.rcgu.o):(.data.DW.ref.rust_eh_personality[DW.ref.rust_eh_personality]+0x0): undefined reference to `rust_eh_personality'
+collect2: error: ld returned 1 exit status
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort --emit=llvm-ir -o - | grep -e '^define.*@lib_call' -e '%cb()' -e '^attributes'
+define void @lib_call(ptr nofree noundef nonnull readonly captures(none) %cb) unnamed_addr #1 !guid !7 {
+  tail call void %cb() #4
+attributes #0 = { cold nofree noreturn nounwind nonlazybind uwtable "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #1 = { nounwind nonlazybind uwtable "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #2 = { nofree nounwind nonlazybind uwtable "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #3 = { noreturn nounwind }
+attributes #4 = { nounwind }
+[exit status 0]
+
+$ rustc +1.85.0 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort --emit=llvm-ir -o - | grep -e '^define.*@lib_call' -e '%cb()' -e '^attributes'
+define void @lib_call(ptr nocapture noundef nonnull readonly %cb) unnamed_addr #1 {
+  tail call void %cb() #4
+attributes #0 = { noreturn nounwind nonlazybind "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #1 = { nounwind nonlazybind "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #2 = { nofree nounwind nonlazybind "probe-stack"="inline-asm" "target-cpu"="x86-64" }
+attributes #3 = { noreturn nounwind }
+attributes #4 = { nounwind }
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs -C panic=abort --cfg c_unwind --emit=llvm-ir -o - | sed -n '/^define.*@lib_call/,/^}/p' | grep -e '^define' -e '%cb()' -e landingpad -e '^ *cleanup$' -e '; call'
+define void @lib_call(ptr nofree noundef nonnull readonly captures(none) %cb) unnamed_addr #2 personality ptr @rust_eh_personality !guid !8 {
+  invoke void %cb()
+  %0 = landingpad { ptr, i32 }
+          cleanup
+; call core::ptr::drop_glue::<lib::Guard>
+; call core::panicking::panic_cannot_unwind
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs --cfg with_std -C panic=abort --cfg c_unwind -o std-abort-C-unwind.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs --cfg with_std -C panic=unwind -o std-unwind-C.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C debug-assertions=yes -C overflow-checks=yes --crate-type staticlib 24-foreign-unwind/lib.rs --cfg with_std -C panic=unwind --cfg c_unwind -o std-unwind-C-unwind.a
+[exit status 0]
+
+######## c.o
+
+$ g++ -Wl,--gc-sections main.o c.o -o throw-c
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o c.o -o thread-c
+[exit status 0]
+
+$ ./throw-c
+main: caught "thrown by the callback"
+[exit status 0]
+
+$ ./thread-c exit
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-c cancel
+main: thread ended: cancelled
+[exit status 0]
+
+######## c-fexceptions.o
+
+$ g++ -Wl,--gc-sections main.o c-fexceptions.o -o throw-c-fexceptions
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o c-fexceptions.o -o thread-c-fexceptions
+[exit status 0]
+
+$ ./throw-c-fexceptions
+lib: cleanup ran
+main: caught "thrown by the callback"
+[exit status 0]
+
+$ ./thread-c-fexceptions exit
+lib: cleanup ran
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-c-fexceptions cancel
+lib: cleanup ran
+main: thread ended: cancelled
+[exit status 0]
+
+######## rust-C.a
+
+$ g++ -Wl,--gc-sections main.o rust-C.a -o throw-rust-C
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o rust-C.a -o thread-rust-C
+[exit status 0]
+
+$ ./throw-rust-C
+main: caught "thrown by the callback"
+[exit status 0]
+
+$ ./thread-rust-C exit
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-rust-C cancel
+main: thread ended: cancelled
+[exit status 0]
+
+######## rust-1.85-C.a
+
+$ g++ -Wl,--gc-sections main.o rust-1.85-C.a -o throw-rust-1.85-C
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o rust-1.85-C.a -o thread-rust-1.85-C
+[exit status 0]
+
+$ ./throw-rust-1.85-C
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  thrown by the callback
+[exit status 134]
+
+$ ./thread-rust-1.85-C exit
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-rust-1.85-C cancel
+main: thread ended: cancelled
+[exit status 0]
+
+######## rust-C-unwind.a
+
+$ g++ -Wl,--gc-sections main.o rust-C-unwind.a -o throw-rust-C-unwind
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o rust-C-unwind.a -o thread-rust-C-unwind
+[exit status 0]
+
+$ ./throw-rust-C-unwind
+[exit status 134]
+
+$ ./thread-rust-C-unwind exit
+[exit status 134]
+
+$ ./thread-rust-C-unwind cancel
+[exit status 134]
+
+######## std-abort-C-unwind.a
+
+$ g++ -Wl,--gc-sections main.o std-abort-C-unwind.a -o throw-std-abort-C-unwind
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o std-abort-C-unwind.a -o thread-std-abort-C-unwind
+[exit status 0]
+
+$ ./throw-std-abort-C-unwind
+lib: drop ran
+
+thread '<unnamed>' (25345) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread caused non-unwinding panic. aborting.
+[exit status 134]
+
+$ ./thread-std-abort-C-unwind exit
+lib: drop ran
+
+thread '<unnamed>' (25353) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread caused non-unwinding panic. aborting.
+[exit status 134]
+
+$ ./thread-std-abort-C-unwind cancel
+lib: drop ran
+
+thread '<unnamed>' (25362) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread caused non-unwinding panic. aborting.
+[exit status 134]
+
+######## std-unwind-C.a
+
+$ g++ -Wl,--gc-sections main.o std-unwind-C.a -o throw-std-unwind-C
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o std-unwind-C.a -o thread-std-unwind-C
+[exit status 0]
+
+$ ./throw-std-unwind-C
+main: caught "thrown by the callback"
+[exit status 0]
+
+$ ./thread-std-unwind-C exit
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-std-unwind-C cancel
+main: thread ended: cancelled
+[exit status 0]
+
+######## std-unwind-C-unwind.a
+
+$ g++ -Wl,--gc-sections main.o std-unwind-C-unwind.a -o throw-std-unwind-C-unwind
+[exit status 0]
+
+$ gcc -pthread -Wl,--gc-sections thread.o std-unwind-C-unwind.a -o thread-std-unwind-C-unwind
+[exit status 0]
+
+$ ./throw-std-unwind-C-unwind
+lib: drop ran
+main: caught "thrown by the callback"
+[exit status 0]
+
+$ ./thread-std-unwind-C-unwind exit
+lib: drop ran
+main: thread ended: pthread_exit(42)
+[exit status 0]
+
+$ ./thread-std-unwind-C-unwind cancel
+lib: drop ran
+main: thread ended: cancelled
+[exit status 0]
+
+                     C++ throw                   pthread_exit()              pthread_cancel()
+c                    cleanup skipped, passed on  cleanup skipped, passed on  cleanup skipped, passed on
+c-fexceptions        cleanup ran, passed on      cleanup ran, passed on      cleanup ran, passed on
+rust-C               cleanup skipped, passed on  cleanup skipped, passed on  cleanup skipped, passed on
+rust-1.85-C          std::terminate()            cleanup skipped, passed on  cleanup skipped, passed on
+rust-C-unwind        abort()                     abort()                     abort()
+std-abort-C-unwind   cleanup ran, abort()        cleanup ran, abort()        cleanup ran, abort()
+std-unwind-C         cleanup skipped, passed on  cleanup skipped, passed on  cleanup skipped, passed on
+std-unwind-C-unwind  cleanup ran, passed on      cleanup ran, passed on      cleanup ran, passed on
+
+RESULT: REPRODUCED: C built with -fexceptions runs its cleanup and passes the unwind on; a no_std panic=abort Rust frame skips its Drop (extern "C", undefined behavior) or aborts (extern "C-unwind")
