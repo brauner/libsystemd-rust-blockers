@@ -1,0 +1,96 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ clang --version | head -1
+Debian clang version 21.1.8 (10)
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib 34-msan-false-positive/rs.rs -o librs.a
+[exit status 0]
+
+$ clang -fsanitize=memory -fsanitize-memory-track-origins -g -O1 34-msan-false-positive/main.c librs.a -o main
+[exit status 0]
+
+$ clang -g -O1 34-msan-false-positive/main.c librs.a -o main-nosan
+[exit status 0]
+
+$ ./main-nosan hex
+00000000deadbeef
+[exit status 0]
+
+$ ./main hex
+==36007==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0x55692403a278 in main 34-msan-false-positive/main.c:27:20
+    #1 0x7f4a55659fb9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:59:16
+    #2 0x7f4a5565a0d6 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x556923f9cf20 in _start ($W/main+0x35f20) (BuildId: 45d3e24d85ab2368213186ef16159668e4d0ce30)
+
+  Uninitialized value was created by an allocation of 'buf' in the stack frame
+    #0 0x55692403a1d8 in main 34-msan-false-positive/main.c:16:9
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value 34-msan-false-positive/main.c:27:20 in main
+Exiting
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib -Z sanitizer=memory 34-msan-false-positive/rs.rs -o librs-msan.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib -Z sanitizer=memory -Z sanitizer-memory-track-origins 34-msan-false-positive/rs.rs -o librs-msan.a
+error: mixing `-Zsanitizer` will cause an ABI mismatch in crate `rs`
+  |
+  = help: the `-Zsanitizer` flag modifies the ABI so Rust crates compiled with different values of this flag cannot be used together safely
+  = note: `-Zsanitizer=memory` in this crate is incompatible with `-Zsanitizer` being unset in dependency `core`
+  = help: unset `-Zsanitizer` in this crate or set `-Zsanitizer=memory` in `core`
+  = help: if you are sure this will not cause problems, you may use `-Cunsafe-allow-abi-mismatch=sanitizer` to silence this error
+
+error: mixing `-Zsanitizer` will cause an ABI mismatch in crate `rs`
+  |
+  = help: the `-Zsanitizer` flag modifies the ABI so Rust crates compiled with different values of this flag cannot be used together safely
+  = note: `-Zsanitizer=memory` in this crate is incompatible with `-Zsanitizer` being unset in dependency `compiler_builtins`
+  = help: unset `-Zsanitizer` in this crate or set `-Zsanitizer=memory` in `compiler_builtins`
+  = help: if you are sure this will not cause problems, you may use `-Cunsafe-allow-abi-mismatch=sanitizer` to silence this error
+
+error: aborting due to 2 previous errors
+
+[exit status 1]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib -Z sanitizer=memory -Z sanitizer-memory-track-origins -C unsafe-allow-abi-mismatch=sanitizer 34-msan-false-positive/rs.rs -o librs-msan.a
+[exit status 0]
+
+$ clang -fsanitize=memory -fsanitize-memory-track-origins -g -O1 34-msan-false-positive/main.c librs-msan.a -o main-msan
+[exit status 0]
+
+$ ./main-msan hex
+00000000deadbeef
+[exit status 0]
+
+$ ./main-msan fmt
+==36067==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0x55f517455278 in main 34-msan-false-positive/main.c:27:20
+    #1 0x7fa124df4fb9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:59:16
+    #2 0x7fa124df50d6 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x55f5173b7f20 in _start ($W/main-msan+0x35f20) (BuildId: 1798c428896e085faf1be6f1d7d7f4b56de9640c)
+
+  Uninitialized value was stored to memory at
+    #0 0x55f5173ec34e in __msan_memcpy ($W/main-msan+0x6a34e) (BuildId: 1798c428896e085faf1be6f1d7d7f4b56de9640c)
+    #1 0x55f5174553e7 in <rs::Buf as core::fmt::Write>::write_str rs.97d8adf70766aad1-cgu.0
+
+  Uninitialized value was created by an allocation of 'junk' in the stack frame
+    #0 0x55f5174552d1 in dirty_stack 34-msan-false-positive/main.c:11:9
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value 34-msan-false-positive/main.c:27:20 in main
+Exiting
+[exit status 1]
+
+RESULT: REPRODUCED: MSan false positives on memory written by Rust code, and by the prebuilt core even with the crate instrumented
