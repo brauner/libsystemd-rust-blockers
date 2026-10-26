@@ -1,0 +1,41 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type dylib 03-dylib-lto/sdshared.rs
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type dylib -C lto=fat 03-dylib-lto/sdshared.rs -o lto-fat.so
+error: lto cannot be used for `dylib` crate type without `-Zdylib-lto`
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type dylib -C lto=thin 03-dylib-lto/sdshared.rs -o lto-thin.so
+error: lto cannot be used for `dylib` crate type without `-Zdylib-lto`
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib -C lto=fat 03-dylib-lto/sdshared.rs
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type cdylib -C lto=fat 03-dylib-lto/sdshared.rs -o cdylib.so
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type dylib -C lto=fat -Zdylib-lto 03-dylib-lto/sdshared.rs -o lto-z.so
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+RESULT: REPRODUCED: -C lto is rejected for crate type dylib without the nightly -Zdylib-lto
