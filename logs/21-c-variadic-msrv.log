@@ -1,0 +1,324 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ wc -l < public.h.list
+17
+[exit status 0]
+
+$ clang -fsyntax-only -Xclang -ast-dump=json -I$SYSTEMD_SRC/src/systemd public.c | jq -r -f 21-c-variadic-msrv/count.jq | sort -u > public.txt
+[exit status 0]
+
+$ cat public.txt
+sd_bus_call_method variadic extern
+sd_bus_call_method_async variadic extern
+sd_bus_call_method_asyncv va_list extern
+sd_bus_call_methodv va_list extern
+sd_bus_emit_interfaces_added variadic extern
+sd_bus_emit_interfaces_removed variadic extern
+sd_bus_emit_properties_changed variadic extern
+sd_bus_emit_signal variadic extern
+sd_bus_emit_signal_to variadic extern
+sd_bus_emit_signal_tov va_list extern
+sd_bus_emit_signalv va_list extern
+sd_bus_error_has_names_sentinel variadic extern
+sd_bus_error_set_errnof variadic extern
+sd_bus_error_set_errnofv va_list extern
+sd_bus_error_setf variadic extern
+sd_bus_error_setfv va_list extern
+sd_bus_message_append variadic extern
+sd_bus_message_appendv va_list extern
+sd_bus_message_new_method_errnof variadic extern
+sd_bus_message_new_method_errorf variadic extern
+sd_bus_message_read variadic extern
+sd_bus_message_readv va_list extern
+sd_bus_path_decode_many variadic extern
+sd_bus_path_encode_many variadic extern
+sd_bus_reply_method_errnof variadic extern
+sd_bus_reply_method_errnofv va_list extern
+sd_bus_reply_method_errorf variadic extern
+sd_bus_reply_method_errorfv va_list extern
+sd_bus_reply_method_return variadic extern
+sd_bus_reply_method_returnv va_list extern
+sd_bus_set_property variadic extern
+sd_bus_set_propertyv va_list extern
+sd_device_set_sysattr_valuef variadic extern
+sd_id128_in_set_sentinel variadic inline
+sd_id128_in_setv va_list inline
+sd_journal_print variadic extern
+sd_journal_print_with_location variadic extern
+sd_journal_printv va_list extern
+sd_journal_printv_with_location va_list extern
+sd_journal_send variadic extern
+sd_journal_send_with_location variadic extern
+sd_json_build variadic extern
+sd_json_buildv va_list extern
+sd_json_variant_append_arrayb variadic extern
+sd_json_variant_merge_objectb variadic extern
+sd_json_variant_set_fieldb variadic extern
+sd_notifyf variadic extern
+sd_pid_notifyf variadic extern
+sd_pid_notifyf_with_fds variadic extern
+sd_varlink_call_and_upgradeb variadic extern
+sd_varlink_callb variadic extern
+sd_varlink_callb_ap va_list extern
+sd_varlink_callb_full variadic extern
+sd_varlink_collectb variadic extern
+sd_varlink_errorb variadic extern
+sd_varlink_invoke_and_upgradeb variadic extern
+sd_varlink_invokeb variadic extern
+sd_varlink_notifyb variadic extern
+sd_varlink_observeb variadic extern
+sd_varlink_replyb variadic extern
+sd_varlink_respond_and_upgradeb variadic extern
+sd_varlink_sendb variadic extern
+sd_varlink_server_add_interface_many_internal variadic extern
+sd_varlink_server_bind_method_many_internal variadic extern
+[exit status 0]
+
+$ cut -d' ' -f2,3 public.txt | sort | uniq -c
+     16 va_list extern
+      1 va_list inline
+     46 variadic extern
+      1 variadic inline
+[exit status 0]
+
+$ grep -oE 'sd_[a-z0-9_]+' $SYSTEMD_SRC/src/libsystemd/libsystemd.sym | sort -u > exported.txt
+[exit status 0]
+
+$ grep ' extern$' public.txt | cut -d' ' -f1 | sort | comm -12 - exported.txt | wc -l
+62
+[exit status 0]
+
+$ clang -fsyntax-only -Xclang -ast-dump=json all.c | jq -r -f 21-c-variadic-msrv/count.jq | sort -u > all.txt
+In file included from all.c:1:
+$SYSTEMD_SRC/src/systemd/_sd-common.h:30:4: error: "Do not include _sd-common.h directly; it is a private header."
+   30 | #  error "Do not include _sd-common.h directly; it is a private header."
+      |    ^
+1 error generated.
+[exit status 1]
+
+$ comm -13 public.txt all.txt
+sd_future_group_add_many_internal variadic extern
+[exit status 0]
+
+$ rustc +1.85.0 --edition 2021 --crate-type staticlib -C panic=abort -O 21-c-variadic-msrv/variadic.rs -o libvariadic.a 2>&1 | tee old.err
+error[E0658]: C-variadic functions are unstable
+  --> 21-c-variadic-msrv/variadic.rs:13:1
+   |
+13 | / pub unsafe extern "C" fn rust_append(buf: *mut c_char, size: usize, types: *const c_char, mut ap: ...) -> c_int {
+14 | |     let mut off = 0;
+15 | |     let mut t = types;
+16 | |     while unsafe { *t } != 0 {
+...  |
+33 | |     off as c_int
+34 | | }
+   | |_^
+   |
+   = note: see issue #44930 <https://github.com/rust-lang/rust/issues/44930> for more information
+
+error[E0658]: C-variadic functions are unstable
+  --> 21-c-variadic-msrv/variadic.rs:46:1
+   |
+46 | / pub unsafe extern "C" fn rust_print(buf: *mut c_char, size: usize, fmt: *const c_char, ap: ...) -> c_int {
+47 | |     unsafe { vsnprintf(buf, size, fmt, ap) }
+48 | | }
+   | |_^
+   |
+   = note: see issue #44930 <https://github.com/rust-lang/rust/issues/44930> for more information
+
+error[E0658]: use of unstable library feature `c_variadic`: the `c_variadic` feature has not been properly tested on all supported platforms
+ --> 21-c-variadic-msrv/variadic.rs:4:42
+  |
+4 | use core::ffi::{c_char, c_double, c_int, VaList};
+  |                                          ^^^^^^
+  |
+  = note: see issue #44930 <https://github.com/rust-lang/rust/issues/44930> for more information
+
+error[E0658]: use of unstable library feature `c_variadic`: the `c_variadic` feature has not been properly tested on all supported platforms
+  --> 21-c-variadic-msrv/variadic.rs:38:107
+   |
+38 | pub unsafe extern "C" fn rust_printv(a: *mut c_char, b: *mut c_char, size: usize, fmt: *const c_char, ap: VaList<'_>) -> c_int {
+   |                                                                                                           ^^^^^^^^^^
+   |
+   = note: see issue #44930 <https://github.com/rust-lang/rust/issues/44930> for more information
+
+error[E0658]: use of unstable library feature `c_variadic`: the `c_variadic` feature has not been properly tested on all supported platforms
+ --> 21-c-variadic-msrv/variadic.rs:8:70
+  |
+8 |     fn vsnprintf(buf: *mut c_char, n: usize, fmt: *const c_char, ap: VaList<'_>) -> c_int;
+  |                                                                      ^^^^^^^^^^
+  |
+  = note: see issue #44930 <https://github.com/rust-lang/rust/issues/44930> for more information
+
+error[E0107]: struct takes 2 lifetime arguments but 1 lifetime argument was supplied
+ --> 21-c-variadic-msrv/variadic.rs:8:70
+  |
+8 |     fn vsnprintf(buf: *mut c_char, n: usize, fmt: *const c_char, ap: VaList<'_>) -> c_int;
+  |                                                                      ^^^^^^ -- supplied 1 lifetime argument
+  |                                                                      |
+  |                                                                      expected 2 lifetime arguments
+  |
+help: add missing lifetime argument
+  |
+8 |     fn vsnprintf(buf: *mut c_char, n: usize, fmt: *const c_char, ap: VaList<'_, '_>) -> c_int;
+  |                                                                               ++++
+
+error[E0107]: struct takes 2 lifetime arguments but 1 lifetime argument was supplied
+  --> 21-c-variadic-msrv/variadic.rs:38:107
+   |
+38 | pub unsafe extern "C" fn rust_printv(a: *mut c_char, b: *mut c_char, size: usize, fmt: *const c_char, ap: VaList<'_>) -> c_int {
+   |                                                                                                           ^^^^^^ -- supplied 1 lifetime argument
+   |                                                                                                           |
+   |                                                                                                           expected 2 lifetime arguments
+   |
+help: add missing lifetime argument
+   |
+38 | pub unsafe extern "C" fn rust_printv(a: *mut c_char, b: *mut c_char, size: usize, fmt: *const c_char, ap: VaList<'_, '_>) -> c_int {
+   |                                                                                                                    ++++
+
+error[E0599]: no method named `next_arg` found for struct `VaListImpl` in the current scope
+  --> 21-c-variadic-msrv/variadic.rs:21:85
+   |
+21 |             b'y' | b'b' | b'i' => unsafe { snprintf(p, n, c"%s%d".as_ptr(), sep, ap.next_arg::<c_int>()) },
+   |                                                                                     ^^^^^^^^ method not found in `VaListImpl<'_>`
+
+error[E0599]: no method named `next_arg` found for struct `VaListImpl` in the current scope
+  --> 21-c-variadic-msrv/variadic.rs:22:73
+   |
+22 |             b't' => unsafe { snprintf(p, n, c"%s%llu".as_ptr(), sep, ap.next_arg::<u64>()) },
+   |                                                                         ^^^^^^^^ method not found in `VaListImpl<'_>`
+
+error[E0599]: no method named `next_arg` found for struct `VaListImpl` in the current scope
+  --> 21-c-variadic-msrv/variadic.rs:23:71
+   |
+23 |             b'd' => unsafe { snprintf(p, n, c"%s%g".as_ptr(), sep, ap.next_arg::<c_double>()) },
+   |                                                                       ^^^^^^^^ method not found in `VaListImpl<'_>`
+
+error[E0599]: no method named `next_arg` found for struct `VaListImpl` in the current scope
+  --> 21-c-variadic-msrv/variadic.rs:24:71
+   |
+24 |             b's' => unsafe { snprintf(p, n, c"%s%s".as_ptr(), sep, ap.next_arg::<*const c_char>()) },
+   |                                                                       ^^^^^^^^ method not found in `VaListImpl<'_>`
+
+error: aborting due to 11 previous errors
+
+Some errors have detailed explanations: E0107, E0599, E0658.
+For more information about an error, try `rustc --explain E0107`.
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=abort -O 21-c-variadic-msrv/variadic.rs -o libvariadic.a
+[exit status 0]
+
+$ gcc -O2 -Wall 21-c-variadic-msrv/main.c libvariadic.a -o variadic
+[exit status 0]
+
+$ ./variadic | tee out.txt
+rust_append: 7 foo 1 18446744073709551615 2.5 -42
+rust_printv: bar=-1 0.5 1099511627776 | bar=-1 0.5 1099511627776
+rust_print:  baz=3 1.5 2199023255552
+[exit status 0]
+
+$ diff -u 21-c-variadic-msrv/expected.txt out.txt
+[exit status 0]
+
+$ grep -n 'VA_FORMAT_ADVANCE' $SYSTEMD_SRC/src/libsystemd/sd-journal/journal-send.c
+180:                VA_FORMAT_ADVANCE(format, ap);
+[exit status 0]
+
+$ grep -n 'long double' $SYSTEMD_SRC/src/basic/stdio-util.h
+66:                        (void) va_arg(ap, long double);                 \
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib --emit=metadata -o long-double.rmeta 21-c-variadic-msrv/long-double.rs
+error[E0658]: the type `f128` is unstable
+ --> 21-c-variadic-msrv/long-double.rs:7:36
+  |
+7 |     let _ = unsafe { ap.next_arg::<f128>() };
+  |                                    ^^^^
+  |
+  = note: see issue #116909 <https://github.com/rust-lang/rust/issues/116909> for more information
+
+error[E0277]: the trait bound `f128: VaArgSafe` is not satisfied
+   --> 21-c-variadic-msrv/long-double.rs:7:36
+    |
+  7 |     let _ = unsafe { ap.next_arg::<f128>() };
+    |                         --------   ^^^^ the nightly-only, unstable trait `VaArgSafe` is not implemented for `f128`
+    |                         |
+    |                         required by a bound introduced by this call
+    |
+    = help: the following other types implement trait `VaArgSafe`:
+              f64
+              i128
+              i32
+              i64
+              isize
+              u128
+              u32
+              u64
+              usize
+note: required by a bound in `VaList::<'f>::next_arg`
+   --> ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ffi/va_list.rs:479:37
+    |
+479 |     pub const unsafe fn next_arg<T: VaArgSafe>(&mut self) -> T {
+    |                                     ^^^^^^^^^ required by this bound in `VaList::<'f>::next_arg`
+
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0277, E0658.
+For more information about an error, try `rustc --explain E0277`.
+[exit status 1]
+
+$ grep -rn 'long double' $RUST_SRC/library/core/src/ffi
+$RUST_SRC/library/core/src/ffi/va_list.rs:422:// - `long double` is IEEE f128 on the platform.
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=abort -O 21-c-variadic-msrv/send.rs -o libsend.a
+[exit status 0]
+
+$ gcc -O2 -Wall 21-c-variadic-msrv/send.c libsend.a -o send
+[exit status 0]
+
+$ ./send | tee send.out
+C:              A=1.000000 B=2.000000 C=3.000000
+Rust, f64:      A=1.000000 B=1.000000 C=1.000000
+Rust, 2 x u64:  A=1.000000
+Rust, C helper: A=1.000000 B=2.000000 C=3.000000
+[exit status 0]
+
+$ grep -n -B2 "^rust_msrv = " $SYSTEMD_SRC/meson.build
+378-# The oldest rustc we support. Also handed to bindgen, so that the generated bindings never require a
+379-# newer compiler than the hand-written code does.
+380:rust_msrv = '1.85'
+[exit status 0]
+
+$ git -C $SYSTEMD_SRC log -1 --format='%h %s%n%n%b' -S"rust_msrv = '1.85'" -- meson.build | grep -B1 -A1 'Debian 13'
+The option is a feature and defaults to auto. We need rustc >= 1.85 and
+bindgen >= 0.71.1 which is exactly what Debian 13 ships. 1.85 is the
+minimum supported Rust version and we hand it to bindgen as well so the
+[exit status 0]
+
+$ grep -n 'Debian 13' $SYSTEMD_SRC/docs/HACKING.md
+109:apt install rustc bindgen rustfmt rust-clippy   # Debian 13
+258:  with the oldest supported one (on Debian 13).
+[exit status 0]
+
+$ grep -n 'c_variadic' $RUST_SRC/compiler/rustc_feature/src/accepted.rs
+100:    (accepted, c_variadic, "1.99.0", Some(44930)),
+103:    (accepted, c_variadic_naked_functions, "1.99.0", Some(148767)),
+[exit status 0]
+
+$ curl -s -m 30 'https://qa.debian.org/madison.php?package=rustc&text=on'
+ rustc | 1.48.0+dfsg1-2         | bullseye         | source, amd64, arm64, armhf, i386
+ rustc | 1.63.0+dfsg1-2         | bookworm         | source, amd64, arm64, armel, armhf, i386, mips64el, mipsel, ppc64el, s390x
+ rustc | 1.85.1+dfsg1-1+deb13u1 | trixie           | source, amd64, arm64, armel, armhf, i386, ppc64el, riscv64, s390x
+ rustc | 1.93.1+dfsg1-2~bpo13+1 | trixie-backports | source
+ rustc | 1.94.1+dfsg1-1~bpo13+3 | trixie-backports | source
+ rustc | 1.95.0+dfsg1-2~bpo13+1 | trixie-backports | source, armel
+ rustc | 1.96.1+dfsg1-2~bpo13+1 | trixie-backports | source, amd64, arm64, armhf, i386, ppc64el, riscv64, s390x
+ rustc | 1.97.1+dfsg1-1         | forky            | source, amd64, arm64, armhf, i386, loong64, ppc64el, riscv64, s390x
+ rustc | 1.97.1+dfsg1-1         | sid              | source, amd64, arm64, armhf, i386, loong64, ppc64el, riscv64, s390x
+ rustc | 1.98.1+dfsg1-1~exp1    | experimental     | source, amd64, arm64, armhf, i386, loong64, ppc64el, s390x
+[exit status 0]
+
+RESULT: REPRODUCED: C-variadic definitions need rustc 1.99, systemd's MSRV is 1.85, and 1.99.1 cannot read an x86_64 long double from a VaList
