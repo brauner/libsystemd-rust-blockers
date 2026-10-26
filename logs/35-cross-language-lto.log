@@ -1,0 +1,132 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ clang --version | head -1
+Debian clang version 21.1.8 (10)
+[exit status 0]
+
+$ $BINDGEN --version
+bindgen 0.72.1
+[exit status 0]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --wrap-static-fns --wrap-static-fns-path wrap --allowlist-function isempty 35-cross-language-lto/h.h -o h.rs
+[exit status 0]
+
+$ tail -1 wrap.c
+bool isempty__extern(const char *a) { return isempty(a); }
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib rs.rs -o librs.a
+[exit status 0]
+
+$ gcc -O2 -fPIC -fvisibility=hidden -flto=auto -ffat-lto-objects -I35-cross-language-lto -c 35-cross-language-lto/count.c -o count.o && gcc -O2 -fPIC -fvisibility=hidden -flto=auto -ffat-lto-objects -I35-cross-language-lto -c 35-cross-language-lto/lib.c -o lib.o && gcc -O2 -fPIC -fvisibility=hidden -flto=auto -ffat-lto-objects -I35-cross-language-lto -c wrap.c -o wrap.o
+[exit status 0]
+
+$ gcc -O2 -fPIC -fvisibility=hidden -flto=auto -ffat-lto-objects -I35-cross-language-lto -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib.o count.o wrap.o librs.a -o libgcc.so
+[exit status 0]
+
+$ disas libgcc.so count_both | grep call
+    1167:	call   11c0 <rs_count_empty>
+    1180:	call   11c0 <rs_count_empty>
+[exit status 0]
+
+$ disas libgcc.so rs_count_empty | grep -E 'call|isempty'
+    11d6:	lea    -0x4d(%rip),%r12        # 1190 <isempty__extern>
+    11e4:	call   *%r12
+[exit status 0]
+
+$ disas libgcc.so isempty__extern
+0000000000001190 <isempty__extern>:
+    1190:	mov    $0x1,%eax
+    1195:	test   %rdi,%rdi
+    1198:	je     11a0 <isempty__extern+0x10>
+    119a:	cmpb   $0x0,(%rdi)
+    119d:	sete   %al
+    11a0:	ret
+    11a1:	nopl   (%rax)
+    11a4:	cs nopw 0x0(%rax,%rax,1)
+    11ae:	xchg   %ax,%ax
+
+[exit status 0]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -I35-cross-language-lto -c 35-cross-language-lto/count.c -o count.lto.o && clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -I35-cross-language-lto -c 35-cross-language-lto/lib.c -o lib.lto.o && clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -I35-cross-language-lto -c wrap.c -o wrap.lto.o
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib -C linker-plugin-lto rs.rs -o librs-lto.a
+[exit status 0]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib.lto.o count.lto.o wrap.lto.o librs-lto.a -fuse-ld=lld -o x.so
+ld.lld: error: Invalid summary version 14. Version should be in the range [1-12].
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+[exit status 1]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib.lto.o count.lto.o wrap.lto.o librs-lto.a -fuse-ld=gold -o x.so
+/usr/bin/ld.gold: fatal error: Failed to link module librs-lto.a.llvm.104984.rs.97d8adf70766aad1-cgu.0: Invalid summary version 14. Version should be in the range [1-12].
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+[exit status 1]
+
+$ rustc +1.85.0 --edition 2021 -O -C panic=abort --crate-type staticlib -C linker-plugin-lto rs.rs -o librs-old.a
+[exit status 0]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib.lto.o count.lto.o wrap.lto.o librs-old.a -fuse-ld=lld -o libclang-old.so
+[exit status 0]
+
+$ disas libclang-old.so count_both | grep -c call
+0
+[exit status 1]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib.lto.o count.lto.o wrap.lto.o librs-lto.a -fuse-ld=lld -B ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld -o libclang.so
+[exit status 0]
+
+$ disas libclang.so count_both | grep -c call
+0
+[exit status 1]
+
+$ clang -O2 -fPIC -fvisibility=hidden -flto=thin -I35-cross-language-lto -c 35-cross-language-lto/lib.c -o lib-pc.lto.o
+[exit status 0]
+
+$ clang --target=x86_64-unknown-linux-gnu -O2 -fPIC -fvisibility=hidden -flto=thin -shared -Wl,--no-undefined -Wl,--version-script=35-cross-language-lto/lib.sym lib-pc.lto.o count.lto.o wrap.lto.o librs-lto.a -fuse-ld=lld -B ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld -Wl,--fatal-warnings -o x.so
+rust-lld: error: Linking two modules of different target triples: 'count.lto.o' is 'x86_64-unknown-linux-gnu' whereas 'lib-pc.lto.o' is 'x86_64-pc-linux-gnu'
+
+
+rust-lld: error: Linking two modules of different target triples: 'librs-lto.a(librs-lto.rs.97d8adf70766aad1-cgu.0.rcgu.o at 104924)' is 'x86_64-unknown-linux-gnu' whereas 'lib-pc.lto.o' is 'x86_64-pc-linux-gnu'
+
+
+rust-lld: error: Linking two modules of different target triples: 'wrap.lto.o' is 'x86_64-unknown-linux-gnu' whereas 'lib-pc.lto.o' is 'x86_64-pc-linux-gnu'
+
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+[exit status 1]
+
+$ gcc -O2 -fPIC -flto=auto -c 35-cross-language-lto/c.c -o c.o && ar rcs libc-lto.a c.o
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type bin 35-cross-language-lto/main.rs -L . -l c -l static=c-lto -o main
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "$W/rustcIxTa5i/symbols.o" "<1 object files omitted>" "-Wl,--as-needed" "-Wl,-Bdynamic" "-lc" "-Wl,-Bstatic" "-lc-lto" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libcore-*,libcompiler_builtins-*}.rlib" "-L" "$W/rustcIxTa5i/raw-dylibs" "-Wl,-Bdynamic" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "." "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "main" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: undefined symbol: c_add1
+          >>> referenced by main.ba8e141620705c7f-cgu.0
+          >>>               main.main.ba8e141620705c7f-cgu.0.rcgu.o:(main)
+          collect2: error: ld returned 1 exit status
+          
+
+error: aborting due to 1 previous error
+
+[exit status 1]
+
+$ rustc +1.85.0 --edition 2021 -O -C panic=abort --crate-type bin 35-cross-language-lto/main.rs -L . -l c -l static=c-lto -o main-old && ./main-old
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type bin 35-cross-language-lto/main.rs -L . -l c -l static=c-lto -C linker-features=-lld -o main && ./main
+[exit status 0]
+
+$ gcc -O2 -fPIC -flto=auto -ffat-lto-objects -c 35-cross-language-lto/c.c -o cfat.o && ar rcs libc-fat.a cfat.o
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type bin 35-cross-language-lto/main.rs -L . -l c -l static=c-fat -o main-fat && ./main-fat && readelf -p .comment main-fat | grep -o 'Linker: LLD [0-9.]*'
+Linker: LLD 23.1.1
+[exit status 0]
+
+RESULT: REPRODUCED: no C<->Rust inlining with GCC LTO, rustc 1.99 bitcode rejected by LLVM 21, rust-lld cannot read GCC LTO objects

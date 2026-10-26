@@ -63,6 +63,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 31 | The GCC based Rust compilers can't fill the gap yet | gccrs fails on core |
 | 33 | Rust code drops the CET (IBT/SHSTK) marking of a shared library | marking dropped |
 | 34 | MemorySanitizer reports false positives for memory written by Rust code | false positive |
+| 35 | No LTO across the C/Rust boundary in the toolchains distros use | no inlining, bitcode rejected |
 
 ## Running them
 
