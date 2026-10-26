@@ -31,6 +31,12 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 06 | A C-ABI Rust shared library can't be used from Rust as a crate | E0786 |
 | 07 | There's no Rust runtime library to share | rlib only, `libstd-<hash>.so` |
 
+## Rust inside a C library
+
+| # | Problem | Result |
+|---|---------|--------|
+| 08 | Two Rust static libraries can't be linked together | duplicate `__rustc::rust_begin_unwind` |
+
 ## Running them
 
 Each directory has a README.md and a run.sh that ends with a RESULT

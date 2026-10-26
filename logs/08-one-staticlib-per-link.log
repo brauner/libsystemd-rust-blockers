@@ -1,0 +1,45 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib 08-one-staticlib-per-link/basic.rs -o libbasic_rust.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib 08-one-staticlib-per-link/sd.rs -o libsystemd_rust.a
+[exit status 0]
+
+$ nm -C libbasic_rust.a libsystemd_rust.a 2>/dev/null | grep -E ' T .*rust_begin_unwind'
+0000000000000000 T __rustc::rust_begin_unwind
+0000000000000000 T __rustc::rust_begin_unwind
+[exit status 0]
+
+$ gcc -O2 08-one-staticlib-per-link/main.c libbasic_rust.a libsystemd_rust.a -Wl,--gc-sections -o main
+/usr/bin/x86_64-linux-gnu-ld.bfd: libsystemd_rust.a(libsystemd_rust.sd.89926b25a36d323-cgu.0.rcgu.o): in function `__rustc::rust_begin_unwind':
+sd.89926b25a36d323-cgu.0:(.text._RNvCs5fGHjzWXRav_7___rustc17rust_begin_unwind+0x0): multiple definition of `__rustc::rust_begin_unwind'; libbasic_rust.a(libbasic_rust.basic.ffd8e3c73b960c0f-cgu.0.rcgu.o):basic.ffd8e3c73b960c0f-cgu.0:(.text._RNvCs5fGHjzWXRav_7___rustc17rust_begin_unwind+0x0): first defined here
+collect2: error: ld returned 1 exit status
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib -Zstaticlib-rename-internal-symbols 08-one-staticlib-per-link/basic.rs -o libbasic_rust.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib -Zstaticlib-rename-internal-symbols 08-one-staticlib-per-link/basic.rs -o libbasic_rust.a
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -C panic=abort -O --crate-type staticlib -Zstaticlib-rename-internal-symbols 08-one-staticlib-per-link/sd.rs -o libsystemd_rust.a
+[exit status 0]
+
+$ gcc -O2 08-one-staticlib-per-link/main.c libbasic_rust.a libsystemd_rust.a -Wl,--gc-sections -o main && ./main
+8 16
+[exit status 0]
+
+RESULT: REPRODUCED: duplicate __rustc::rust_begin_unwind from two staticlibs
