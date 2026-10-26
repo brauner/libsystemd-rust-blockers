@@ -1,0 +1,91 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ readelf -n $(gcc -print-file-name=crti.o) | grep 'x86 feature' || echo 'no x86 feature property in crti.o'
+no x86 feature property in crti.o
+[exit status 0]
+
+$ gcc -O2 -fPIC -fcf-protection=full -c 33-cet-shadow-stack/lib.c -o lib.o
+[exit status 0]
+
+$ gcc -O2 -fPIC -fcf-protection=full -c 33-cet-shadow-stack/add.c -o add.o
+[exit status 0]
+
+$ gcc -shared -nostartfiles -Wl,--gc-sections lib.o add.o -o libc-only.so
+[exit status 0]
+
+$ readelf -n libc-only.so | grep 'x86 feature'
+      Properties: x86 feature: IBT, SHSTK
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort -C overflow-checks=yes --crate-type staticlib 33-cet-shadow-stack/rs.rs -o librs.a
+[exit status 0]
+
+$ gcc -shared -nostartfiles -Wl,--gc-sections lib.o librs.a -o libwith-rust.so
+[exit status 0]
+
+$ readelf -n libwith-rust.so | grep 'x86 feature'
+[exit status 1]
+
+$ gcc -shared -nostartfiles -Wl,--gc-sections lib.o librs.a -o x.so -Wl,-z,cet-report=error
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs.a(librs.rs.97d8adf70766aad1-cgu.0.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs.a(core-1d288395a3394ed3.core.efd5e57aef94d71e-cgu.0.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.157.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.200.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.225.rcgu.o): error: missing IBT and SHSTK properties
+collect2: error: ld returned 1 exit status
+[exit status 1]
+
+$ readelf -n core/*.o | grep -c 'x86 feature'
+0
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort -C overflow-checks=yes --crate-type staticlib -Z cf-protection=full 33-cet-shadow-stack/rs.rs -o librs-cf.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -O -C panic=abort -C overflow-checks=yes --crate-type staticlib -Z cf-protection=full 33-cet-shadow-stack/rs.rs -o librs-cf.a
+[exit status 0]
+
+$ gcc -shared -nostartfiles -Wl,--gc-sections lib.o librs-cf.a -o x.so -Wl,-z,cet-report=error
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs-cf.a(core-1d288395a3394ed3.core.efd5e57aef94d71e-cgu.0.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs-cf.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.157.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs-cf.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.200.rcgu.o): error: missing IBT and SHSTK properties
+/usr/bin/x86_64-linux-gnu-ld.bfd: librs-cf.a(compiler_builtins-2d9557d6e902a200.compiler_builtins.2ae8f9d4cd35b9b2-cgu.225.rcgu.o): error: missing IBT and SHSTK properties
+collect2: error: ld returned 1 exit status
+[exit status 1]
+
+$ gcc -shared -nostartfiles -Wl,--gc-sections lib.o librs-cf.a -o libwith-rust-cf.so
+[exit status 0]
+
+$ readelf -n libwith-rust-cf.so | grep 'x86 feature'
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort -C overflow-checks=yes --crate-type staticlib -Z stack-protector=strong 33-cet-shadow-stack/rs.rs -o librs-sp.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+$ nm core/*.o | grep -c __stack_chk_fail
+0
+[exit status 1]
+
+RESULT: REPRODUCED: IBT/SHSTK marking dropped by stable Rust code and by the prebuilt core

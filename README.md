@@ -61,6 +61,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 |---|---------|--------|
 | 30 | rustc can't build for alpha, hppa and sh4, and only experimentally for m68k | no target, m68k layout differs from GCC |
 | 31 | The GCC based Rust compilers can't fill the gap yet | gccrs fails on core |
+| 33 | Rust code drops the CET (IBT/SHSTK) marking of a shared library | marking dropped |
 
 ## Running them
 
