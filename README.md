@@ -55,6 +55,12 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 26 | Stable Rust can't reference an optional (weak) symbol | E0658, link error |
 | 27 | Journal files change under the reader, which a Rust `&T` must not see | stale read |
 
+## Toolchain and platforms
+
+| # | Problem | Result |
+|---|---------|--------|
+| 30 | rustc can't build for alpha, hppa and sh4, and only experimentally for m68k | no target, m68k layout differs from GCC |
+
 ## Running them
 
 Each directory has a README.md and a run.sh that ends with a RESULT

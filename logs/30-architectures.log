@@ -1,0 +1,136 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ git -C $SYSTEMD_SRC log -1 --format='systemd %h %cs' && git -C $RUST_SRC log -1 --format='rust %h %cs'
+systemd e9795a90b7 2026-10-25
+rust 846e51f66b1 2026-10-26
+[exit status 0]
+
+$ grep -n '^ *ARCHITECTURE_[A-Z0-9_]*,$' $SYSTEMD_SRC/src/basic/architecture.h | tr -d ' ,' | paste -s -d ' '
+13:ARCHITECTURE_ALPHA 14:ARCHITECTURE_ARC 15:ARCHITECTURE_ARC_BE 16:ARCHITECTURE_ARM 17:ARCHITECTURE_ARM64 18:ARCHITECTURE_ARM64_BE 19:ARCHITECTURE_ARM_BE 20:ARCHITECTURE_CRIS 21:ARCHITECTURE_IA64 22:ARCHITECTURE_LOONGARCH64 23:ARCHITECTURE_M68K 24:ARCHITECTURE_MIPS 25:ARCHITECTURE_MIPS64 26:ARCHITECTURE_MIPS64_LE 27:ARCHITECTURE_MIPS_LE 28:ARCHITECTURE_NIOS2 29:ARCHITECTURE_PARISC 30:ARCHITECTURE_PARISC64 31:ARCHITECTURE_PPC 32:ARCHITECTURE_PPC64 33:ARCHITECTURE_PPC64_LE 34:ARCHITECTURE_PPC_LE 35:ARCHITECTURE_RISCV32 36:ARCHITECTURE_RISCV64 37:ARCHITECTURE_S390 38:ARCHITECTURE_S390X 39:ARCHITECTURE_SH 40:ARCHITECTURE_SH64 41:ARCHITECTURE_SPARC 42:ARCHITECTURE_SPARC64 43:ARCHITECTURE_TILEGX 44:ARCHITECTURE_X86 45:ARCHITECTURE_X86_64
+[exit status 0]
+
+$ wc -l < targets; grep -c -- '-linux' targets
+331
+92
+[exit status 0]
+
+$ grep -n 'error "Missing LIB_ARCH_TUPLE' $SYSTEMD_SRC/src/basic/architecture.h
+94:#    error "Missing LIB_ARCH_TUPLE for PPCLE"
+101:#  error "Missing LIB_ARCH_TUPLE for HPPA64"
+180:#  error "Missing LIB_ARCH_TUPLE for SH64"
+219:#  error "Missing LIB_ARCH_TUPLE for CRIS"
+[exit status 0]
+
+ARCH         BEST RUSTC TARGET (of N)             TIER MD-LINE 1.99 LLVM  RUST-STD -> VERDICT
+ALPHA        -                                    -    -       -    -     - -> MISSING
+ARC          -                                    -    -       -    -     - -> MISSING
+ARC_BE       -                                    -    -       -    -     - -> MISSING
+ARM          arm-unknown-linux-gnueabi (17)       2h   98      2    yes   yes -> OK
+ARM64        aarch64-unknown-linux-gnu (5)        1h   45      1    yes   yes -> OK
+ARM64_BE     aarch64_be-unknown-linux-gnu (3)     3    298     3    yes   no -> TIER3
+ARM_BE       armeb-unknown-linux-gnueabi (1)      3    308     3    yes   no -> TIER3
+CRIS         -                                    -    -       -    -     - -> MISSING, no systemd build either
+IA64         -                                    -    -       -    -     - -> MISSING
+LOONGARCH64  loongarch64-unknown-linux-gnu (3)    2h   102     2    yes   yes -> OK
+M68K         m68k-unknown-linux-gnu (1)           3    360     3    yes   no -> TIER3
+MIPS         mips-unknown-linux-gnu (4)           3    362     3    yes   no -> TIER3
+MIPS64       mips64-unknown-linux-gnuabi64 (3)    3    366     3    yes   no -> TIER3
+MIPS64_LE    mips64el-unknown-linux-gnuabi64 (3)  3    368     3    yes   no -> TIER3
+MIPS_LE      mipsel-unknown-linux-gnu (4)         3    372     3    yes   no -> TIER3
+NIOS2        -                                    -    -       -    -     - -> MISSING
+PARISC       -                                    -    -       -    -     - -> MISSING
+PARISC64     -                                    -    -       -    -     - -> MISSING, no systemd build either
+PPC          powerpc-unknown-linux-gnu (4)        2h   104     2    yes   yes -> OK
+PPC64        powerpc64-unknown-linux-gnu (3)      2h   105     2    yes   yes -> OK
+PPC64_LE     powerpc64le-unknown-linux-gnu (2)    2h   107     2    yes   yes -> OK
+PPC_LE       -                                    -    -       -    -     - -> MISSING, no systemd build either
+RISCV32      riscv32gc-unknown-linux-gnu (2)      3    404     3    yes   no -> TIER3
+RISCV64      riscv64gc-unknown-linux-gnu (3)      2h   109     2    yes   yes -> OK
+S390         -                                    -    -       -    -     - -> MISSING
+S390X        s390x-unknown-linux-gnu (2)          2h   111     2    yes   yes -> OK
+SH           -                                    -    -       -    -     - -> MISSING
+SH64         -                                    -    -       -    -     - -> MISSING, no systemd build either
+SPARC        sparc-unknown-linux-gnu (1)          3    430     3    yes   no -> TIER3
+SPARC64      sparc64-unknown-linux-gnu (1)        2    207     2    yes   yes -> OK
+TILEGX       -                                    -    -       -    -     - -> MISSING
+X86          i686-unknown-linux-gnu (4)           1h   46      1    yes   yes -> OK
+X86_64       x86_64-unknown-linux-gnu (7)         1h   49      1    yes   yes -> OK
+X32          x86_64-unknown-linux-gnux32 (1)      2    233     2    yes   yes -> OK
+
+$ grep -E '^(alpha|hppa|parisc|sh[0-9]?-|ia64|nios2|cris|tile|arc)' targets || echo 'no target for alpha, hppa/parisc, sh, ia64, nios2, cris, tile or arc'
+no target for alpha, hppa/parisc, sh, ia64, nios2, cris, tile or arc
+[exit status 0]
+
+$ rustc +1.99.1 --target ./base.json --print target-cpus 2>&1 | head -1
+error: error loading target specification: custom targets are unstable and require `-Zunstable-options`
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./alpha.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: alpha-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./hppa.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: hppa-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./sh4.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: sh4-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./ia64.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: ia64-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./nios2.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: nios2-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./arc.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: arc-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./s390.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: s390-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./tilegx.json --print target-cpus 2>&1 | head -1
+error: failed to parse target machine config to target machine: could not create LLVM TargetMachine for triple: tilegx-unknown-linux-gnu
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Z unstable-options --target ./m68k.json --print target-cpus 2>&1 | head -1
+Available CPUs for this target:
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type rlib --target m68k-unknown-linux-gnu lib.rs 2>&1 | head -3
+error[E0463]: can't find crate for `core`
+  |
+  = note: the `m68k-unknown-linux-gnu` target may not be installed
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2024 --crate-type rlib --crate-name core --target m68k-unknown-linux-gnu -O -Cpanic=abort library/core/src/lib.rs -o libcore.rlib 2>&1 | grep -m1 E0554
+error[E0554]: `#![feature]` may not be used on the stable release channel
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2024 --crate-type rlib --crate-name core --target m68k-unknown-linux-gnu -O -Cpanic=abort library/core/src/lib.rs -o libcore.rlib && ls libcore.rlib
+libcore.rlib
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 --crate-type rlib --target m68k-unknown-linux-gnu --extern core=libcore.rlib --emit=metadata layout.rs 2>&1 | grep -E '^[0-9]+ \| const|found one with' | sed 's/^ *|  *-* *\^* //'
+4 | const _: [(); 0] = [(); core::mem::align_of::<u64>()];
+expected an array with a size of 0, found one with a size of 4
+5 | const _: [(); 0] = [(); core::mem::align_of::<f64>()];
+expected an array with a size of 0, found one with a size of 8
+6 | const _: [(); 0] = [(); core::mem::size_of::<S>()];
+expected an array with a size of 0, found one with a size of 12
+7 | const _: [(); 0] = [(); core::mem::size_of::<D>()];
+expected an array with a size of 0, found one with a size of 16
+[exit status 0]
+
+MISSING: ALPHA ARC ARC_BE IA64 NIOS2 PARISC S390 SH TILEGX
+MISSING, systemd does not build there either: CRIS PARISC64 PPC_LE SH64
+TIER3: ARM64_BE ARM_BE M68K MIPS MIPS64 MIPS64_LE MIPS_LE RISCV32 SPARC
+OK: ARM ARM64 LOONGARCH64 PPC PPC64 PPC64_LE RISCV64 S390X SPARC64 X86 X86_64 X32
+
+RESULT: REPRODUCED: 9 architectures systemd builds on have no rustc target (ALPHA,ARC,ARC_BE,IA64,NIOS2,PARISC,S390,SH,TILEGX), 9 only tier 3 ones
