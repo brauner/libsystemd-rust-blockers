@@ -1,0 +1,98 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib 27-shared-mmap-aliasing/reader.rs -o libreader.a
+[exit status 0]
+
+$ gcc -O2 -I27-shared-mmap-aliasing -c 27-shared-mmap-aliasing/reader.c 27-shared-mmap-aliasing/main.c
+[exit status 0]
+
+$ gcc main.o reader.o libreader.a -o journal
+[exit status 0]
+
+$ ./journal | tee out
+C, const struct header *:  n_entries before 0, after 1
+Rust, &Header:             n_entries before 0, after 0
+Rust, *const Header:       n_entries before 0, after 1
+Rust, read_volatile():     n_entries before 0, after 1
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib 27-shared-mmap-aliasing/reader.rs --emit=llvm-ir -o - | grep -e '^define.*@reads_' -e ' load ' -e '@wait_for_journald()'
+define { i64, i64 } @reads_ptr(ptr nofree noundef readonly captures(none) %h) unnamed_addr #1 !guid !5 {
+  %before = load i64, ptr %0, align 8, !noundef !6
+  tail call void @wait_for_journald() #2
+  %_4 = load i64, ptr %0, align 8, !noundef !6
+define { i64, i64 } @reads_ref(ptr noalias nofree noundef readonly align 8 captures(none) dereferenceable(160) %h) unnamed_addr #1 !guid !7 {
+  %before = load i64, ptr %0, align 8, !noundef !6
+  tail call void @wait_for_journald() #2
+define { i64, i64 } @reads_volatile(ptr nofree noundef captures(address) %h) unnamed_addr #1 !guid !8 {
+  %before = load volatile i64, ptr %p, align 8
+  tail call void @wait_for_journald() #2
+  %_5 = load volatile i64, ptr %p, align 8
+declare void @wait_for_journald() unnamed_addr #1
+[exit status 0]
+
+$ objdump -d --no-show-raw-insn -M intel --disassemble=reads_ref libreader.a | grep -A7 '<reads_ref>:'
+0000000000000000 <reads_ref>:
+   0:	push   rbx
+   1:	mov    rbx,QWORD PTR [rdi+0x98]
+   8:	call   QWORD PTR [rip+0x0]        # e <reads_ref+0xe>
+   e:	mov    rax,rbx
+  11:	mov    rdx,rbx
+  14:	pop    rbx
+  15:	ret
+[exit status 0]
+
+$ objdump -d --no-show-raw-insn -M intel --disassemble=reads_c reader.o | grep -A12 '<reads_c>:'
+0000000000000000 <reads_c>:
+   0:	push   rbp
+   1:	mov    rbp,rdi
+   4:	push   rbx
+   5:	sub    rsp,0x8
+   9:	mov    rbx,QWORD PTR [rdi+0x98]
+  10:	call   15 <reads_c+0x15>
+  15:	mov    rdx,QWORD PTR [rbp+0x98]
+  1c:	add    rsp,0x8
+  20:	mov    rax,rbx
+  23:	pop    rbx
+  24:	pop    rbp
+  25:	ret
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib 27-shared-mmap-aliasing/packed.rs -o x.rlib
+error[E0793]: reference to field of packed struct is unaligned
+  --> 27-shared-mmap-aliasing/packed.rs:18:5
+   |
+18 |     &o.size
+   |     ^^^^^^^
+   |
+   = note: this struct is 1-byte aligned, but the type of this field may require higher alignment
+   = note: creating a misaligned reference is undefined behavior (even if that reference is never dereferenced)
+   = help: copy the field contents to a local variable, or replace the reference with a raw pointer and use `read_unaligned`/`write_unaligned` (loads and stores via `*p` must be properly aligned even when using raw pointers)
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0793`.
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib 27-shared-mmap-aliasing/packed.rs -o x.rlib --cfg ok
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib 27-shared-mmap-aliasing/packed.rs -o x.rlib --cfg atomic
+error[E0793]: reference to field of packed struct is unaligned
+  --> 27-shared-mmap-aliasing/packed.rs:38:5
+   |
+38 |     o.size.load(core::sync::atomic::Ordering::Relaxed)
+   |     ^^^^^^
+   |
+   = note: this struct is 1-byte aligned, but the type of this field may require higher alignment
+   = note: creating a misaligned reference is undefined behavior (even if that reference is never dereferenced)
+   = help: copy the field contents to a local variable, or replace the reference with a raw pointer and use `read_unaligned`/`write_unaligned` (loads and stores via `*p` must be properly aligned even when using raw pointers)
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0793`.
+[exit status 1]
+
+RESULT: REPRODUCED: reading through &Header, rustc keeps n_entries from before the call (noalias readonly); C, a raw pointer and read_volatile() read it again
