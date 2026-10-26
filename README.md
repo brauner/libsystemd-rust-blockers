@@ -42,6 +42,12 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 12 | A staticlib leaks core through libsystemd-shared's export-all version script | 545 exports, 277 KB vs 18 KB |
 | 13 | The prebuilt core can't be rebuilt with our flags | `-Zbuild-std` is nightly |
 
+## Language
+
+| # | Problem | Result |
+|---|---------|--------|
+| 20 | No thread-local statics in no_std Rust on stable | E0658 |
+
 ## Running them
 
 Each directory has a README.md and a run.sh that ends with a RESULT
