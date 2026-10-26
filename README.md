@@ -48,6 +48,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 |---|---------|--------|
 | 20 | No thread-local statics in no_std Rust on stable | E0658 |
 | 21 | No C-variadic definitions at the 1.85 MSRV, and no `long double` on 1.99 | E0658 on 1.85, wrong fields on 1.99.1 |
+| 22 | The `alloc` crate aborts on allocation failure, libsystemd returns `-ENOMEM` | SIGABRT instead of -12 |
 
 ## Running them
 

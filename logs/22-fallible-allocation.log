@@ -1,0 +1,169 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ git -C $SYSTEMD_SRC grep -o 'return -ENOMEM' -- src/libsystemd | wc -l
+373
+[exit status 0]
+
+$ git -C $SYSTEMD_SRC grep -o -E '[a-z_]*log_oom[a-z_]*\(' -- src/libsystemd | sed 's/.*://' | sort | uniq -c
+      8 json_log_oom(
+     17 log_oom(
+     27 log_oom_debug(
+[exit status 0]
+
+$ git -C $SYSTEMD_SRC grep -l -e '-ENOMEM' -- 'man/sd*.xml' | wc -l
+62
+[exit status 0]
+
+$ grep -n 'xpointer="errors"' $SYSTEMD_SRC/man/sd_bus_message_append.xml
+222:    <xi:include href="sd_bus_message_append_basic.xml" xpointer="errors" />
+[exit status 0]
+
+$ grep -n -A2 '<constant>-ENOMEM</constant>' $SYSTEMD_SRC/man/sd_bus_message_append_basic.xml
+239:          <term><constant>-ENOMEM</constant></term>
+240-
+241-          <listitem><para>Memory allocation failed.</para></listitem>
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C panic=abort -O 22-fallible-allocation/join.rs -o libjoin.a
+[exit status 0]
+
+$ gcc -O2 -Wall 22-fallible-allocation/main.c libjoin.a -o join
+[exit status 0]
+
+$ ./join c_join 3
+c_join(n=3) = 26
+caller still running
+[exit status 0]
+
+$ ./join rust_join 3
+rust_join(n=3) = 26
+caller still running
+[exit status 0]
+
+$ ./join rust_join_try_reserve 3
+rust_join_try_reserve(n=3) = 26
+caller still running
+[exit status 0]
+
+$ (ulimit -v 102400; ./join c_join 10000000)
+c_join(n=10000000) = -12 (Cannot allocate memory)
+caller still running
+[exit status 0]
+
+$ (ulimit -v 102400; ./join rust_join_try_reserve 10000000)
+rust_join_try_reserve(n=10000000) = -12 (Cannot allocate memory)
+caller still running
+[exit status 0]
+
+$ (ulimit -v 102400; ./join rust_join 10000000)
+rust: memory allocation of 240000000 bytes failed
+22-fallible-allocation/../common.sh: line 39: 24436 Aborted                    (core dumped) ( ulimit -v 102400; ./join rust_join 10000000 )
+[exit status 134]
+rust_join() caller killed by SIGABRT
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib --emit=metadata -o try.rmeta 22-fallible-allocation/try.rs 2>&1 | tee try.err
+error[E0658]: use of unstable library feature `allocator_api`
+  --> 22-fallible-allocation/try.rs:10:13
+   |
+10 |     let _ = Box::try_new(1u64);
+   |             ^^^^^^^^^^^^
+   |
+   = note: see issue #32838 <https://github.com/rust-lang/rust/issues/32838> for more information
+
+error[E0658]: use of unstable library feature `vec_push_within_capacity`
+  --> 22-fallible-allocation/try.rs:11:15
+   |
+11 |     let _ = v.push_within_capacity(1);
+   |               ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: see issue #100486 <https://github.com/rust-lang/rust/issues/100486> for more information
+
+error[E0599]: no method named `try_push` found for mutable reference `&mut Vec<u64>` in the current scope
+  --> 22-fallible-allocation/try.rs:12:15
+   |
+12 |     let _ = v.try_push(1);
+   |               ^^^^^^^^
+   |
+help: there is a method `push` with a similar name
+   |
+12 -     let _ = v.try_push(1);
+12 +     let _ = v.push(1);
+   |
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0599, E0658.
+For more information about an error, try `rustc --explain E0599`.
+[exit status 1]
+
+$ grep -E '^error\[E0(658|599)\]' try.err
+error[E0658]: use of unstable library feature `allocator_api`
+error[E0658]: use of unstable library feature `vec_push_within_capacity`
+error[E0599]: no method named `try_push` found for mutable reference `&mut Vec<u64>` in the current scope
+[exit status 0]
+
+$ grep -n -A3 '^const fn handle_error' $RUST_SRC/library/alloc/src/raw_vec/mod.rs
+926:const fn handle_error(e: TryReserveError) -> ! {
+927-    match e.kind() {
+928-        CapacityOverflow => capacity_overflow(),
+929-        AllocError { layout, .. } => handle_alloc_error(layout),
+[exit status 0]
+
+$ grep -n -A6 'pub unsafe fn __rdl_alloc_error_handler' $RUST_SRC/library/alloc/src/alloc.rs
+698:    pub unsafe fn __rdl_alloc_error_handler(size: usize, _align: usize) -> ! {
+699-        core::panicking::panic_nounwind_fmt(
+700-            format_args!("memory allocation of {size} bytes failed"),
+701-            /* force_no_backtrace */ false,
+702-        )
+703-    }
+704-}
+[exit status 0]
+
+$ grep -n -B4 -E 'pub fn (try_new|new_in)\(x: T' $RUST_SRC/library/alloc/src/boxed.rs
+458-    ///
+459-    /// [memory layout]: self#memory-layout
+460-    #[unstable(feature = "allocator_ext", issue = "163177", implied_by = "allocator_api")]
+461-    #[inline]
+462:    pub fn try_new(x: T) -> Result<Self, AllocError> {
+--
+529-    #[cfg(not(no_global_oom_handling))]
+530-    #[stable(feature = "allocator_api", since = "1.100.0")]
+531-    #[must_use]
+532-    #[inline]
+533:    pub fn new_in(x: T, alloc: A) -> Self {
+[exit status 0]
+
+$ grep -n -B2 -E 'pub fn (push_within_capacity|try_with_capacity|try_reserve)\(' $RUST_SRC/library/alloc/src/vec/mod.rs
+544-    #[inline]
+545-    #[unstable(feature = "try_with_capacity", issue = "91913")]
+546:    pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
+--
+1442-    /// ```
+1443-    #[stable(feature = "try_reserve", since = "1.57.0")]
+1444:    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
+--
+2791-    #[inline]
+2792-    #[unstable(feature = "vec_push_within_capacity", issue = "100486")]
+2793:    pub fn push_within_capacity(&mut self, value: T) -> Result<&mut T, T> {
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.85.0 -Zoom=panic --crate-type lib --emit=metadata -o empty.rmeta empty.rs
+[exit status 0]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 -Zoom=panic --crate-type lib --emit=metadata -o empty.rmeta empty.rs
+error: unknown unstable option: `oom`
+
+[exit status 1]
+
+$ git -C $RUST_SRC show -s --date=short --format='%h %cd %s%n%b' 377656d3dd3 | grep -E 'Auto merge|Zoom'
+377656d3dd3 2025-12-10 Auto merge of #149836 - matthiaskrgr:rollup-1ypvt7r, r=matthiaskrgr
+ - rust-lang/rust#147725 (Remove -Zoom=panic)
+[exit status 0]
+
+$ git -C $RUST_SRC show 377656d3dd3:src/version
+1.94.0
+[exit status 0]
+
+RESULT: REPRODUCED: an allocation failure in alloc's infallible API aborts the caller instead of returning -ENOMEM
