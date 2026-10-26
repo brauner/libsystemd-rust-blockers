@@ -64,6 +64,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 33 | Rust code drops the CET (IBT/SHSTK) marking of a shared library | marking dropped |
 | 34 | MemorySanitizer reports false positives for memory written by Rust code | false positive |
 | 35 | No LTO across the C/Rust boundary in the toolchains distros use | no inlining, bitcode rejected |
+| 36 | bindgen leaves out our macros and needs trampolines for static inline functions | 1124 macros, 673 static inline functions |
 
 ## Running them
 

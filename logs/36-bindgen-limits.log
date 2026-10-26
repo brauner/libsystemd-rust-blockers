@@ -1,0 +1,118 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ $BINDGEN --version
+bindgen 0.72.1
+[exit status 0]
+
+$ git -C $SYSTEMD_SRC log -1 --format='%h %cs'
+e9795a90b7 2026-10-25
+[exit status 0]
+
+$ (cd $SYSTEMD_SRC && find src/fundamental src/basic src/libsystemd src/systemd -name '*.h' | sort | xargs awk -f 36-bindgen-limits/count.awk)
+dir           macros  inline  minline   bitf
+fundamental      192      51        4      0
+basic            558     547        6      0
+libsystemd       161      69        0     54
+systemd          213       6        1      2
+total           1124     673       11     56
+[exit status 0]
+
+$ (cd $SYSTEMD_SRC && grep -rho -w -E 'assert_return|_public_' src/libsystemd --include='*.c' | sort | uniq -c)
+   2012 assert_return
+    873 _public_
+[exit status 0]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --allowlist-file '.*/src/(fundamental|basic|systemd)/.*' 36-bindgen-limits/macros.h -o macros.rs -- -include 36-bindgen-limits/config.h -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -isystem $SYSTEMD_SRC/src/include/glibc -isystem $SYSTEMD_SRC/src/include/override -isystem $SYSTEMD_SRC/src/include/uapi -I$SYSTEMD_SRC/src/fundamental -I$SYSTEMD_SRC/src/basic -I$SYSTEMD_SRC/src/systemd
+[exit status 0]
+
+$ for m in assert_return log_debug_errno TAKE_PTR streq IN_SET HASHMAP_FOREACH CMSG_FOREACH strjoina; do echo "$m $(grep -c -w $m macros.rs)"; done
+assert_return 0
+log_debug_errno 0
+TAKE_PTR 0
+streq 0
+IN_SET 0
+HASHMAP_FOREACH 0
+CMSG_FOREACH 0
+strjoina 0
+[exit status 0]
+
+$ grep -c -w -E 'assert_return|log_debug_errno|TAKE_PTR|streq|IN_SET|HASHMAP_FOREACH|CMSG_FOREACH|strjoina' macros.rs
+0
+[exit status 1]
+
+$ grep -o -w -E 'pub fn (log_assert_failed_return|log_internal|_hashmap_iterate)' macros.rs
+pub fn log_assert_failed_return
+pub fn _hashmap_iterate
+pub fn log_internal
+[exit status 0]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --allowlist-file '.*/src/(fundamental|basic|systemd)/.*' --clang-macro-fallback 36-bindgen-limits/macros.h -o macros-fallback.rs -- -include 36-bindgen-limits/config.h -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -isystem $SYSTEMD_SRC/src/include/glibc -isystem $SYSTEMD_SRC/src/include/override -isystem $SYSTEMD_SRC/src/include/uapi -I$SYSTEMD_SRC/src/fundamental -I$SYSTEMD_SRC/src/basic -I$SYSTEMD_SRC/src/systemd
+[exit status 0]
+
+$ grep -c -w -E 'assert_return|log_debug_errno|TAKE_PTR|streq|IN_SET|HASHMAP_FOREACH|CMSG_FOREACH|strjoina' macros-fallback.rs
+0
+[exit status 1]
+
+$ grep -c -w -E 'pub fn (isempty|streq_ptr)' macros.rs
+0
+[exit status 1]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --allowlist-file '.*/src/(fundamental|basic|systemd)/.*' --wrap-static-fns --wrap-static-fns-path wrap 36-bindgen-limits/macros.h -o macros-wrap.rs -- -include 36-bindgen-limits/config.h -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -isystem $SYSTEMD_SRC/src/include/glibc -isystem $SYSTEMD_SRC/src/include/override -isystem $SYSTEMD_SRC/src/include/uapi -I$SYSTEMD_SRC/src/fundamental -I$SYSTEMD_SRC/src/basic -I$SYSTEMD_SRC/src/systemd
+[exit status 0]
+
+$ grep -c '__extern(' wrap.c
+115
+[exit status 0]
+
+$ grep -E '^bool (isempty|streq_ptr)__extern' wrap.c
+bool streq_ptr__extern(const sd_char *a, const sd_char *b) { return streq_ptr(a, b); }
+bool isempty__extern(const sd_char *a) { return isempty(a); }
+[exit status 0]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --allowlist-file '.*/src/(fundamental|basic|systemd)/.*' --wrap-static-fns --wrap-static-fns-path fdwrap 36-bindgen-limits/fd.h -o fd.rs -- -include 36-bindgen-limits/config.h -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -isystem $SYSTEMD_SRC/src/include/glibc -isystem $SYSTEMD_SRC/src/include/override -isystem $SYSTEMD_SRC/src/include/uapi -I$SYSTEMD_SRC/src/fundamental -I$SYSTEMD_SRC/src/basic -I$SYSTEMD_SRC/src/systemd
+[exit status 0]
+
+$ grep close_pairp fdwrap.c
+void close_pairp__extern(int *p [2]) { close_pairp(p); }
+[exit status 0]
+
+$ gcc -include 36-bindgen-limits/config.h -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -isystem $SYSTEMD_SRC/src/include/glibc -isystem $SYSTEMD_SRC/src/include/override -isystem $SYSTEMD_SRC/src/include/uapi -I$SYSTEMD_SRC/src/fundamental -I$SYSTEMD_SRC/src/basic -I$SYSTEMD_SRC/src/systemd -c fdwrap.c -o fdwrap.o 2>&1 | grep error:
+fdwrap.c:15:52: error: passing argument 1 of ‘close_pairp’ from incompatible pointer type [-Wincompatible-pointer-types]
+[exit status 0]
+
+$ $BINDGEN --use-core --ctypes-prefix core::ffi --allowlist-type sd_bus_vtable 36-bindgen-limits/vt.h -o vt.rs -- -I$SYSTEMD_SRC/src
+[exit status 0]
+
+$ sed -n '/^pub struct sd_bus_vtable {/,/^}/p' vt.rs
+pub struct sd_bus_vtable {
+    pub _bitfield_align_1: [u64; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
+    pub x: sd_bus_vtable__bindgen_ty_1,
+}
+[exit status 0]
+
+$ grep -E 'pub (const )?fn (type_|set_type|flags|set_flags|new_bitfield_1)\(' vt.rs
+    pub fn type_(&self) -> u8 {
+    pub fn set_type(&mut self, val: u8) {
+    pub fn flags(&self) -> u64 {
+    pub fn set_flags(&mut self, val: u64) {
+    pub fn new_bitfield_1(type_: u8, flags: u64) -> __BindgenBitfieldUnit<[u8; 8usize]> {
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type lib --emit=metadata vtuse.rs -o vtuse.rmeta
+error[E0015]: cannot call non-const associated function `sd_bus_vtable::new_bitfield_1` in constants
+ --> vtuse.rs:9:18
+  |
+9 |     _bitfield_1: sd_bus_vtable::new_bitfield_1(b'>', 0),
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: calls in constants are limited to constant functions, tuple structs and tuple variants
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0015`.
+[exit status 1]
+
+RESULT: REPRODUCED: function-like macros dropped, static inline functions only via C trampolines, bitfields as storage plus non-const accessors
