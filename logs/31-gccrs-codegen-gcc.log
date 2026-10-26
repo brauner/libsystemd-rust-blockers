@@ -1,0 +1,109 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ $GCCRS -B$GCCRS_B --version | head -1
+x86_64-linux-gnu-gccrs-16 (Debian 16.2.0-3) 16.2.0
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -c lib.rs -o lib.o 2>&1 | head -1
+crab1: fatal error: gccrs is not yet able to compile Rust code properly. Most of the errors produced will be the fault of gccrs and not the crate you are trying to compile. Because of this, please report errors directly to us instead of opening issues on said crate's repository.
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -c lib.rs -o lib.o 2>&1 | head -4
+crab1: error: failed to locate crate ‘core’
+crab1: error: unknown crate ‘core’
+crab1: error: unknown crate ‘core’
+lib.rs:2:35: error: Cannot find path ‘core::cmp::max’ in this scope [E0433]
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -c nocore.rs -o nocore.o 2>&1 | head -2
+crab1: error: failed to locate crate ‘core’
+crab1: error: unknown crate ‘core’
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -frust-compile-until=attributecheck -w -c lib.rs -o core.o 2>&1 | count
+0 errors
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -frust-compile-until=expansion -w -c lib.rs -o core.o 2>&1 | count
+0 errors
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -frust-compile-until=astvalidation -w -c lib.rs -o core.o 2>&1 | count
+337 errors
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -frust-compile-until=typecheck -w -c lib.rs -o core.o 2>&1 | count
+1935 errors
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -frust-compile-until=astvalidation -w -c lib.rs -o core.o 2>&1 | grep 'error:' | sed 's/:[0-9]*:[0-9]*: error:/: error:/' | sort | uniq -c | sort -rn | head -5
+     16 ./num/flt2dec/mod.rs: error: could not resolve macro invocation ‘assert’ [E0433]
+     11 ./num/flt2dec/strategy/grisu.rs: error: could not resolve macro invocation ‘assert’ [E0433]
+     11 ./num/flt2dec/strategy/dragon.rs: error: could not resolve macro invocation ‘assert’ [E0433]
+      3 ./num/flt2dec/mod.rs: error: could not resolve trait ‘Clone’
+      3 ./num/error.rs: error: could not resolve trait ‘PartialEq’
+[exit status 0]
+
+$ $GCCRS -B$GCCRS_B -frust-incomplete-and-experimental-compiler-do-not-use -frust-edition=2018 -frust-crate=core -w -c lib.rs -o core.o 2>&1 | count; ls core.o
+1935 errors
+ls: cannot access 'core.o': No such file or directory
+[exit status 2]
+
+$ rustc +1.99.1 -Zcodegen-backend=gcc --crate-type lib lib.rs 2>&1 | head -1
+error: the option `Z` is only accepted on the nightly compiler
+[exit status 0]
+
+$ awk '/^\[pkg\.(rustc-codegen-gcc-preview|gcc-[a-z0-9_]+-[a-z]+-[a-z]+-[a-z]+-preview)\.target\./ { n++; t = 1; next } t && /available = true/ { a++ } { t = 0 } END { print n + 0, "target entries,", a + 0, "available" }' ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/multirust-channel-manifest.toml
+68 target entries, 0 available
+[exit status 0]
+
+$ grep -n -E '^# WIP|primary goal|requires a patched libgccjit' $RUST_SRC/compiler/rustc_codegen_gcc/Readme.md
+1:# WIP libgccjit codegen backend for rust
+12:The primary goal of this project is to be able to compile Rust code on platforms unsupported by LLVM.
+17:Note: **This requires a patched libgccjit in order to work.
+[exit status 0]
+
+$ grep -n 'must be supported by the rust compiler' $RUST_SRC/compiler/rustc_codegen_gcc/doc/tips.md
+76:If the target is not yet supported by the Rust compiler, create a [target specification file](https://docs.rust-embedded.org/embedonomicon/custom-target.html) (note that the `arch` specified in this file must be supported by the rust compiler).
+[exit status 0]
+
+$ ls $RUST_SRC/compiler/rustc_codegen_gcc/target_specs
+m68k-unknown-linux-gnu.json
+[exit status 0]
+
+$ grep -n -A6 'commands: \[' $RUST_SRC/compiler/rustc_codegen_gcc/.github/workflows/m68k.yml
+27:        commands: [
+28-          "--std-tests",
+29-          # FIXME(antoyo): fix those on m68k.
+30-          #"--test-libcore",
+31-          #"--test-successful-rustc --nb-parts 2 --current-part 0",
+32-          #"--test-successful-rustc --nb-parts 2 --current-part 1",
+33-          #"--test-failing-rustc",
+[exit status 0]
+
+$ grep -n -B1 -A2 'This prevents rustc_codegen_gcc from being built' $RUST_SRC/src/bootstrap/src/core/build_steps/dist.rs
+1758-    fn run(self, builder: &Builder<'_>) -> Option<GeneratedTarball> {
+1759:        // This prevents rustc_codegen_gcc from being built for "dist"
+1760-        // or "install" on the stable/beta channels. It is not yet stable and
+1761-        // should not be included.
+[exit status 0]
+
+$ grep -n -B3 'not supported by rustc_codegen_gcc' $RUST_SRC/src/bootstrap/src/core/build_steps/dist.rs
+1766-        let target = self.target;
+1767-        if target != "x86_64-unknown-linux-gnu" {
+1768-            builder
+1769:                .info(&format!("target `{target}` not supported by rustc_codegen_gcc. skipping"));
+[exit status 0]
+
+$ sed -n '/pub enum Arch {/,/^    }/p' $RUST_SRC/compiler/rustc_target/src/spec/mod.rs | grep -o '"[a-z0-9_]*"' | paste -s -d ' '
+"aarch64" "amdgpu" "arm" "arm64ec" "avr" "bpf" "csky" "hexagon" "loongarch32" "loongarch64" "m68k" "mips" "mips32r6" "mips64" "mips64r6" "msp430" "nvptx64" "powerpc" "powerpc64" "riscv32" "riscv64" "s390x" "sparc" "sparc64" "spirv" "wasm32" "wasm64" "x86" "x86_64" "xtensa"
+[exit status 0]
+
+$ grep -n -B1 'no lowering implemented' $RUST_SRC/compiler/rustc_target/src/callconv/mod.rs
+778-            arch @ (Arch::SpirV | Arch::Other(_)) => {
+779:                panic!("no lowering implemented for {arch}")
+[exit status 0]
+
+RESULT: REPRODUCED: gccrs cannot compile core 1.49.0, rustc_codegen_gcc is nightly and x86_64 only, and rustc has no C ABI for alpha, hppa or sh
