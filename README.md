@@ -29,6 +29,7 @@ context is our Rust policy in docs/CODING_STYLE.md:
 | 04 | A Rust-ABI shared library exports all of core, and two of them don't mix | 272 KB vs 4 KB, E0152 |
 | 05 | A shared library linked by rustc can't have versioned symbols | rust-lld drops them, GNU ld fails |
 | 06 | A C-ABI Rust shared library can't be used from Rust as a crate | E0786 |
+| 07 | There's no Rust runtime library to share | rlib only, `libstd-<hash>.so` |
 
 ## Running them
 

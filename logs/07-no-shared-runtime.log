@@ -1,0 +1,51 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ ls ~/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib | grep -E '^lib(core|alloc|std)-'
+liballoc-3988244237fec6ee.rlib
+liballoc-3988244237fec6ee.rmeta
+libcore-1d288395a3394ed3.rlib
+libcore-1d288395a3394ed3.rmeta
+libstd-7e719de9c4abc98f.rlib
+libstd-7e719de9c4abc98f.rmeta
+libstd-7e719de9c4abc98f.so
+[exit status 0]
+
+$ ls ~/.rustup/toolchains/1.85.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib | grep -E '^lib(core|alloc|std)-'
+liballoc-715bc629a88bca60.rlib
+libcore-406129d0e3fbc101.rlib
+libstd-6273572f18644c87.rlib
+libstd-6273572f18644c87.so
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -C prefer-dynamic 07-no-shared-runtime/hello.rs -o hello
+[exit status 0]
+
+$ rustc +1.85.0 --edition 2021 -C prefer-dynamic 07-no-shared-runtime/hello.rs -o hello-old
+[exit status 0]
+
+$ readelf -d hello hello-old | grep -E 'File:|NEEDED.*std'
+File: hello
+ 0x0000000000000001 (NEEDED)             Shared library: [libstd-7e719de9c4abc98f.so]
+File: hello-old
+ 0x0000000000000001 (NEEDED)             Shared library: [libstd-6273572f18644c87.so]
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -C prefer-dynamic 07-no-shared-runtime/lib.rs -o libdyn.a
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 --crate-type staticlib -Zstaticlib-prefer-dynamic 07-no-shared-runtime/lib.rs -o libdyn2.a
+error: the option `Z` is only accepted on the nightly compiler
+
+help: consider switching to a nightly toolchain: `rustup default nightly`
+
+note: selecting a toolchain with `+toolchain` arguments require a rustup proxy; see <https://rust-lang.github.io/rustup/concepts/index.html>
+
+note: for more information about Rust's stability policy, see <https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#unstable-features>
+
+error: 1 nightly option were parsed
+
+[exit status 1]
+
+RESULT: REPRODUCED: core/alloc are rlib-only and libstd is libstd-7e719de9c4abc98f.so vs libstd-6273572f18644c87.so
