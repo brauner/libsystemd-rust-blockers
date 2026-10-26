@@ -1,0 +1,96 @@
+# rustc 1.99.1 (58cf8f9c3 2026-10-13)
+# gcc (Debian 16.2.0-1) 16.2.0
+# x86_64 7.1.13+deb14-amd64
+
+$ gcc -O2 -fPIC -c 26-weak-linkage/hook.c 26-weak-linkage/provider.c 26-weak-linkage/main.c
+[exit status 0]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections hook.o -o libc-without.so
+[exit status 0]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections hook.o provider.o -o libc-with.so
+[exit status 0]
+
+$ nm -D libc-without.so | grep optional_hook
+                 w optional_hook
+[exit status 0]
+
+$ gcc main.o ./libc-without.so -o c-without && ./c-without
+C: optional_hook() not linked in
+[exit status 0]
+
+$ gcc main.o ./libc-with.so -o c-with && ./c-with
+C: optional_hook() linked in, returns 1
+[exit status 0]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib 26-weak-linkage/weak.rs -o x.a
+error[E0658]: the `linkage` attribute is experimental and not portable across platforms
+ --> 26-weak-linkage/weak.rs:7:7
+  |
+7 |     #[linkage = "extern_weak"]
+  |       ^^^^^^^
+  |
+  = note: see issue #29603 <https://github.com/rust-lang/rust/issues/29603> for more information
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0658`.
+[exit status 1]
+
+$ rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib 26-weak-linkage/hook.rs -o libhook.a
+warning: function pointers are not nullable, so checking them for null will always return false
+  --> 26-weak-linkage/hook.rs:14:8
+   |
+14 |     if (hook as *const ()).is_null() {
+   |        ^----^^^^^^^^^^^^^^^^^^^^^^^^
+   |         |
+   |         expression has type `unsafe extern "C" fn() -> bool`
+   |
+   = help: wrap the function pointer inside an `Option` and use `Option::is_none` to check for null pointer value
+   = note: `#[warn(useless_ptr_null_checks)]` on by default
+
+warning: 1 warning emitted
+
+[exit status 0]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections -Wl,-u,report libhook.a -o librust-without.so
+/usr/bin/x86_64-linux-gnu-ld.bfd: libhook.a(libhook.hook.bb33a161961ae370-cgu.0.rcgu.o): in function `report':
+hook.bb33a161961ae370-cgu.0:(.text.report+0x3): undefined reference to `optional_hook'
+collect2: error: ld returned 1 exit status
+[exit status 1]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections -Wl,-u,report libhook.a provider.o -o librust-with.so
+[exit status 0]
+
+$ gcc main.o ./librust-with.so -o rust-with && ./rust-with
+Rust: optional_hook() linked in, returns 1
+[exit status 0]
+
+$ objcopy --weaken-symbol=optional_hook libhook.a libhook-weak.a
+[exit status 0]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections -Wl,-u,report libhook-weak.a -o librust-weak.so
+[exit status 0]
+
+$ objdump -d --no-show-raw-insn -M intel --disassemble=report librust-weak.so | grep -A3 '<report>:'
+0000000000001100 <report>:
+    1100:	push   rax
+    1101:	call   QWORD PTR [rip+0x2ec9]        # 3fd0 <optional_hook>
+    1107:	movzx  esi,al
+[exit status 0]
+
+$ gcc main.o ./librust-weak.so -o rust-weak && ./rust-weak
+26-weak-linkage/../common.sh: line 39: 25889 Segmentation fault         (core dumped) ./rust-weak
+[exit status 139]
+
+$ RUSTC_BOOTSTRAP=1 rustc +1.99.1 --edition 2021 -O -C panic=abort --crate-type staticlib -Zcrate-attr='feature(linkage)' 26-weak-linkage/weak.rs -o libweak.a
+[exit status 0]
+
+$ gcc -shared -Wl,--no-undefined -Wl,--gc-sections -Wl,-u,report libweak.a -o librust-nightly.so
+[exit status 0]
+
+$ gcc main.o ./librust-nightly.so -o rust-nightly && ./rust-nightly
+Rust: optional_hook() not linked in
+[exit status 0]
+
+RESULT: REPRODUCED: C links the weak reference with --no-undefined and sees NULL; stable Rust rejects #[linkage = "extern_weak"] (E0658), and a plain extern reference is undefined at link time
